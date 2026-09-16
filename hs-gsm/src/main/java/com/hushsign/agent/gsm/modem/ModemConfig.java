@@ -89,6 +89,18 @@ public record ModemConfig(
         }
 
         public ModemConfig build() {
+            if (baudRate <= 0 || openTimeoutMs <= 0 || responseTimeoutMs <= 0 || pollWaitMs <= 0) {
+                throw new IllegalArgumentException("baud/open/response/poll timings must be positive");
+            }
+            if (probeAttempts < 1) {
+                throw new IllegalArgumentException("probeAttempts must be >= 1");
+            }
+            if (commandWaitMs < 0 || probeRetryDelayMs < 0) {
+                throw new IllegalArgumentException("delays must not be negative");
+            }
+            if (maxConsecutiveErrors < 1) {
+                throw new IllegalArgumentException("maxConsecutiveErrors must be >= 1");
+            }
             return new ModemConfig(gatewayId, simPin, simPin2, baudRate, openTimeoutMs,
                     probeAttempts, probeRetryDelayMs, responseTimeoutMs, commandWaitMs,
                     pollWaitMs, maxConsecutiveErrors);

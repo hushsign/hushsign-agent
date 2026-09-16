@@ -43,6 +43,10 @@ message model beyond `MsIsdn`, crypto/encrypted messages (invariant 8).
 5. `Common` — trimmed to the two used helpers.
 6. `AbstractModemDriver` — added protected `setIn`/`setOut` so the fresh
    serial implementation (P1-S2) can bind its streams from its own package.
+7. `AbstractModemDriver` — bounded the `AT+CMGS` `>` prompt wait in
+   `atSendPDUMessage`/`atSendTEXTMessage` (upstream spins forever); a modem
+   that never sends the prompt now throws `TimeoutException` after the
+   configured response timeout.
 
 ## Modernization (P1-S1 baseline)
 

@@ -42,8 +42,10 @@ public final class JSerialCommSerialPort implements SerialPort {
     @Override
     public void writeBytes(byte[] bytes) throws IOException {
         int written = delegate.writeBytes(bytes, bytes.length);
-        if (written < 0) {
-            throw new IOException("write failed on serial port " + name());
+        if (written != bytes.length) {
+            // a short (or failed) write would silently corrupt a PDU
+            throw new IOException("short write on serial port " + name()
+                    + ": " + written + "/" + bytes.length);
         }
     }
 

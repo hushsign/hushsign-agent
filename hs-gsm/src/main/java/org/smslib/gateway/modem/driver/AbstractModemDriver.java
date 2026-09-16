@@ -543,8 +543,17 @@ public abstract class AbstractModemDriver
 	public int atSendPDUMessage(int size, String pdu) throws Exception
 	{
 		write(String.format("AT+CMGS=%d\r", size), true);
+		// HushSign: bounded prompt wait — a modem that never sends the '>'
+		// prompt must time out, not hang the send thread forever.
+		int wait = Integer.valueOf(getModemSettings("wait_unit"));
+		int timeout = Integer.valueOf(getModemSettings("timeout"));
+		int elapsed = 0;
 		while (this.buffer.length() == 0)
-			Common.countSheeps(Integer.valueOf(getModemSettings("wait_unit")));
+		{
+			if (elapsed >= timeout) throw new TimeoutException("No '>' prompt from " + getPortInfo());
+			Common.countSheeps(wait);
+			elapsed += wait;
+		}
 		Common.countSheeps(Integer.valueOf(getModemSettings("wait_unit")) * Integer.valueOf(getModemSettings("delay_before_send_pdu")));
 		clearResponses();
 		write(pdu, true);
@@ -559,8 +568,16 @@ public abstract class AbstractModemDriver
 		write(String.format("AT+CSCS=\"%s\"\r", this.modem.getDeviceInformation().getEncoding()), true);
 		if (!this.responseOk) throw new Exception("Unsupported encoding: " + this.modem.getDeviceInformation().getEncoding());
 		write(String.format("AT+CMGS=\"%s\"\r", recipient), true);
+		// HushSign: bounded prompt wait (see atSendPDUMessage).
+		int wait = Integer.valueOf(getModemSettings("wait_unit"));
+		int timeout = Integer.valueOf(getModemSettings("timeout"));
+		int elapsed = 0;
 		while (this.buffer.length() == 0)
-			Common.countSheeps(Integer.valueOf(getModemSettings("wait_unit")));
+		{
+			if (elapsed >= timeout) throw new TimeoutException("No '>' prompt from " + getPortInfo());
+			Common.countSheeps(wait);
+			elapsed += wait;
+		}
 		Common.countSheeps(Integer.valueOf(getModemSettings("wait_unit")) * Integer.valueOf(getModemSettings("delay_before_send_pdu")));
 		clearResponses();
 		write(text, true);

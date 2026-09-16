@@ -140,12 +140,16 @@ public final class EmissionConsumer implements AutoCloseable {
     }
 
     private void pollLoop() {
-        try {
-            while (!closed.get()) {
+        while (!closed.get()) {
+            try {
                 pollOnce(Duration.ofMillis(500));
+            } catch (WakeupException e) {
+                // close() asked us to stop
+                break;
+            } catch (RuntimeException e) {
+                // transient poll/commit errors must not kill the agent loop
+                LOG.error("poll iteration failed on {}; continuing", topic(), e);
             }
-        } catch (WakeupException e) {
-            // close() asked us to stop
         }
     }
 

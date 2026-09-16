@@ -91,4 +91,16 @@ class ModemTest {
         assertThrows(ModemException.class, () -> modem.sendPdu("0011"),
                 "quarantined modem must refuse sends");
     }
+
+    @Test
+    void sendTimesOutWhenThePromptNeverComes() throws Exception {
+        TestSerialPort port = new TestSerialPort("COM3");
+        Modem modem = openedModem(port, "OK\r\n", "356789123456789\r\nOK\r\n");
+        // the modem accepts AT+CMGS but never answers with the "> " prompt
+        port.scriptResponse("");
+
+        assertThrows(ModemException.class, () -> modem.sendPdu("0011"),
+                "a missing prompt must time out, not hang the send thread");
+        assertEquals(ModemState.DEGRADED, modem.state());
+    }
 }
