@@ -27,5 +27,24 @@ Fresh, injectable serial I/O + modem lifecycle on top of the vendored AT layer.
   READY/BUSY/DEGRADED/ERROR state; consecutive failures quarantine the modem
 - `modem.ModemScanner` — scans serial ports for the first answering modem
 
-Golden PDU corpus tests land with P1-S3; technique generators with P1-S4.
+## Golden PDU corpus (P1-S3)
+
+`GoldenCorpusTest` parses 14 PDU capture vectors from the product owner's
+HushSMS session (cross-checked with PduSpy): normal SMS, Class 0 flash,
+silent Type 0, WAP push (empty/SL/SI × no-prefix/http/https),
+MMS_NOTIFY_EMPTY and MWI (deactivate, count 1, count 123). Assertions cover
+the full header (TP-MTI, TP-DA, TP-PID, TP-DCS, TP-UDL, TP-UDHI) and the
+user-data bytes byte-for-byte, plus UDH ports for the WAP family.
+
+Notes on the captures:
+
+- HushSMS omits the SMSC-info field when no SMSC is configured; the corpus
+  prefixes the zero-length SMSC octet (`00`) the vendored parser expects.
+- Class 0 is sent with DCS `0x18` but 7-bit-packed text (TS 23.038 would
+  read `0x18` as UCS2) — the corpus asserts raw bytes and decodes the
+  payload explicitly.
+- Generators reproduce the normal/silent captures; for Class 0 the strict
+  generator emits UCS2, so only the DCS round-trip is asserted.
+
+Technique generators land with P1-S4.
 
