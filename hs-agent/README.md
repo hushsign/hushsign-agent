@@ -22,3 +22,15 @@ loop, policy engine, audit chain, dedupe, spool, heartbeat.
 
 Depends on `hs-protocol` (vendored wire protocol, see `../protocol/VENDORED.md`).
 Tests use `MockConsumer`; the real-broker E2E lands in P1-S13.
+
+## P1-S7 — dedupe store
+
+`com.hushsign.agent.runtime.dedupe.DedupeStore`:
+
+- Atomic `tryClaim(emissionId)` — only the first claim wins; redeliveries drop
+  before the execution pipeline (see `DedupingEmissionHandler`).
+- Persisted append-only file, survives restarts; the window is bounded
+  (`maxEntries`), evicting the oldest id and rewriting the file atomically.
+- Fail-closed: if a claim cannot be persisted, it is rolled back and a
+  `DedupeException` propagates — a send whose uniqueness cannot be
+  guaranteed is never attempted.
