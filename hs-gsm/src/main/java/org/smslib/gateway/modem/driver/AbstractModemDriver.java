@@ -54,6 +54,18 @@ public abstract class AbstractModemDriver
 
 	public abstract String getPortInfo();
 
+	// HushSign: protected seam so the fresh serial implementation (P1-S2) can
+	// bind its streams without living in this package.
+	protected void setIn(InputStream inputStream)
+	{
+		this.in = inputStream;
+	}
+
+	protected void setOut(OutputStream outputStream)
+	{
+		this.out = outputStream;
+	}
+
 	public AbstractModemDriver(ModemContext modem)
 	{
 		modemProperties = new Properties();

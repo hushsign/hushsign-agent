@@ -41,6 +41,8 @@ message model beyond `MsIsdn`, crypto/encrypted messages (invariant 8).
 4. `Capabilities` — removed `matches(OutboundMessage)`, which belonged to the
    routing machinery.
 5. `Common` — trimmed to the two used helpers.
+6. `AbstractModemDriver` — added protected `setIn`/`setOut` so the fresh
+   serial implementation (P1-S2) can bind its streams from its own package.
 
 ## Modernization (P1-S1 baseline)
 
