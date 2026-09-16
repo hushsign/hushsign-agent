@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hushsign.dev/schemas/v1/delivery-report.json",
+  "title": "DeliveryReport",
+  "description": "Optional enrichment: network delivery report for a transmission. Published on hs.reports.delivery.v1, keyed by transmissionId. Silent pings often never produce DRs, so nothing depends on them. Enums are append-only.",
+  "type": "object",
+  "required": ["protocolVersion", "transmissionId", "status", "receivedAt"],
+  "properties": {
+    "protocolVersion": { "type": "string", "enum": ["1"] },
+    "transmissionId": { "type": "string", "format": "uuid" },
+    "status": { "type": "string", "enum": ["DELIVERED", "UNDELIVERED", "UNKNOWN"] },
+    "cause": { "type": ["string", "null"], "maxLength": 255 },
+    "receivedAt": { "type": "string", "format": "date-time" }
+  }
+}

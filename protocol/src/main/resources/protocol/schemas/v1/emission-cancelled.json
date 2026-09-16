@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hushsign.dev/schemas/v1/emission-cancelled.json",
+  "title": "EmissionCancelled",
+  "description": "Best-effort cancellation command: agents drop not-yet-started work for this emission. Published on hs.emissions.cancelled.v1, keyed by emissionId. Like every command it carries issuedAt and is subject to the freshness gate.",
+  "type": "object",
+  "required": ["protocolVersion", "emissionId", "issuedAt"],
+  "properties": {
+    "protocolVersion": { "type": "string", "enum": ["1"] },
+    "emissionId": { "type": "string", "format": "uuid" },
+    "issuedAt": { "type": "string", "format": "date-time" }
+  }
+}

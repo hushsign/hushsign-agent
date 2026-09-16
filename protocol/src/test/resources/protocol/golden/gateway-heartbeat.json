@@ -1,0 +1,37 @@
+{
+  "protocolVersion": "1",
+  "gatewayId": "gw-buc-01",
+  "version": "0.1.0",
+  "policyHash": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+  "configHash": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+  "sequence": 41,
+  "uptimeSeconds": 3600,
+  "sentAt": "2026-09-10T12:05:00Z",
+  "modems": [
+    {
+      "serial": "SIMCOM-7600E-0001",
+      "model": "SIM7600E",
+      "manufacturer": "SIMCom",
+      "status": "READY",
+      "portHint": "/dev/serial/by-id/usb-SIMCOM_SIM7600E-0001",
+      "memoryStore": "SM",
+      "signalQuality": 18
+    }
+  ],
+  "sims": [
+    {
+      "iccidHash": "89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567",
+      "imsiHash": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "operator": "226-10",
+      "label": "primary",
+      "active": true,
+      "modemSerial": "SIMCOM-7600E-0001",
+      "msisdnMasked": "+40722••••22"
+    }
+  ],
+  "counters": {
+    "transmissionsAccepted": 2,
+    "transmissionsRejected": 0,
+    "emissionsExpired": 1
+  }
+}

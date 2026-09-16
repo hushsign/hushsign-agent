@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hushsign.dev/schemas/v1/transmission-result.json",
+  "title": "TransmissionResult",
+  "description": "Agent -> platform record of one send attempt. Published on hs.transmissions.v1, keyed by emissionId. Immutable; corrections are new rows (attempt+1), never edits. Enums are append-only.",
+  "type": "object",
+  "required": [
+    "protocolVersion",
+    "transmissionId",
+    "emissionId",
+    "attempt",
+    "outcome",
+    "gatewayId",
+    "requestedAt",
+    "completedAt"
+  ],
+  "properties": {
+    "protocolVersion": { "type": "string", "enum": ["1"] },
+    "transmissionId": { "type": "string", "format": "uuid" },
+    "emissionId": { "type": "string", "format": "uuid" },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "outcome": {
+      "type": "string",
+      "enum": ["ACCEPTED", "REJECTED", "FAILED", "EXPIRED", "CANCELLED", "BLOCKED_BY_POLICY"]
+    },
+    "failureCause": { "type": ["string", "null"], "maxLength": 255 },
+    "pduSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "operatorRef": { "type": ["string", "null"], "pattern": "^[0-9]{3}-[0-9]{2,3}$" },
+    "gatewayId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "modemId": { "type": ["string", "null"], "maxLength": 128 },
+    "simId": { "type": ["string", "null"], "maxLength": 128 },
+    "requestedAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": "string", "format": "date-time" }
+  }
+}

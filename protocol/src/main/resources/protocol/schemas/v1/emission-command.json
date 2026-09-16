@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hushsign.dev/schemas/v1/emission-command.json",
+  "title": "EmissionCommand",
+  "description": "Platform -> agent command asking a gateway to execute one technique against one target. Published on hs.emissions.{operator}, keyed by msisdn. Enums are append-only: new technique codes may be added, existing ones never removed or renamed.",
+  "type": "object",
+  "required": [
+    "protocolVersion",
+    "emissionId",
+    "scheduleId",
+    "warrantRef",
+    "targetRef",
+    "msisdn",
+    "technique",
+    "operator",
+    "attempt",
+    "maxAttempts",
+    "issuedAt",
+    "expiresAt"
+  ],
+  "properties": {
+    "protocolVersion": { "type": "string", "enum": ["1"] },
+    "emissionId": { "type": "string", "format": "uuid" },
+    "scheduleId": { "type": "string", "format": "uuid" },
+    "warrantRef": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "targetRef": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "msisdn": { "type": "string", "pattern": "^\\+?[0-9]{7,15}$" },
+    "technique": {
+      "type": "string",
+      "enum": ["SILENT_TP0", "WAP_PUSH_EMPTY", "WAP_PUSH_SL", "WAP_PUSH_SI", "MWI_TOGGLE", "MMS_NOTIFY_EMPTY"]
+    },
+    "operator": { "type": "string", "pattern": "^[0-9]{3}-[0-9]{2,3}$" },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "maxAttempts": { "type": "integer", "minimum": 1 },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" }
+  }
+}

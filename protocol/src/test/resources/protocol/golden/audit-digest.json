@@ -1,0 +1,9 @@
+{
+  "protocolVersion": "1",
+  "gatewayId": "gw-buc-01",
+  "periodStart": "2026-09-10T12:00:00Z",
+  "periodEnd": "2026-09-10T13:00:00Z",
+  "entryCount": 12,
+  "chainHead": "f0e1d2c3b4a59687f0e1d2c3b4a59687f0e1d2c3b4a59687f0e1d2c3b4a59687",
+  "chainPrev": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+}

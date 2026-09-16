@@ -6,24 +6,25 @@
     <artifactId>agent-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hs-agent</artifactId>
-  <name>HushSign Agent — Runtime</name>
-  <description>Edge runtime: Kafka I/O, modem pool, execution loop, policy engine, audit chain, dedupe, spool, heartbeat.</description>
+  <artifactId>hs-protocol</artifactId>
+  <name>HushSign Agent — Vendored Wire Protocol</name>
+  <description>Vendored copy of the platform wire protocol (JSON Schemas v1, records, validators). Kept in sync with platform/libs/protocol; drift check lands in P1-S12.</description>
+
   <dependencies>
     <dependency>
-      <groupId>com.hushsign</groupId>
-      <artifactId>hs-gsm-technique</artifactId>
-      <version>${project.version}</version>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.17.2</version>
     </dependency>
     <dependency>
-      <groupId>com.hushsign</groupId>
-      <artifactId>hs-protocol</artifactId>
-      <version>${project.version}</version>
+      <groupId>com.fasterxml.jackson.datatype</groupId>
+      <artifactId>jackson-datatype-jsr310</artifactId>
+      <version>2.17.2</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.kafka</groupId>
-      <artifactId>kafka-clients</artifactId>
-      <version>3.7.1</version>
+      <groupId>com.networknt</groupId>
+      <artifactId>json-schema-validator</artifactId>
+      <version>1.5.6</version>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>

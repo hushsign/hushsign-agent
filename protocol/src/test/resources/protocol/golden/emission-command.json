@@ -1,0 +1,14 @@
+{
+  "protocolVersion": "1",
+  "emissionId": "5c9f7a2e-66f1-4b1f-9e7f-1f2a3b4c5d6e",
+  "scheduleId": "b4c1a2d3-84f5-4a4c-8c0f-112233445566",
+  "warrantRef": "w-2026-0142",
+  "targetRef": "t-8842",
+  "msisdn": "+40722111222",
+  "technique": "SILENT_TP0",
+  "operator": "226-10",
+  "attempt": 1,
+  "maxAttempts": 3,
+  "issuedAt": "2026-09-10T12:00:00Z",
+  "expiresAt": "2026-09-10T12:10:00Z"
+}

@@ -1,0 +1,15 @@
+{
+  "protocolVersion": "1",
+  "transmissionId": "9a1c2d3e-4f5a-6b7c-8d9e-0f1a2b3c4d5e",
+  "emissionId": "5c9f7a2e-66f1-4b1f-9e7f-1f2a3b4c5d6e",
+  "attempt": 1,
+  "outcome": "ACCEPTED",
+  "failureCause": null,
+  "pduSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "operatorRef": "226-10",
+  "gatewayId": "gw-buc-01",
+  "modemId": "SIMCOM-7600E-0001",
+  "simId": "sim-0041",
+  "requestedAt": "2026-09-10T12:01:00Z",
+  "completedAt": "2026-09-10T12:01:07Z"
+}

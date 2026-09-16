@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hushsign.dev/schemas/v1/audit-digest.json",
+  "title": "AuditDigest",
+  "description": "Hourly summary of the device audit chain: counts and hashes only, no entries and no numbers. Published on hs.audit.digest.v1, keyed by gatewayId. chainPrev is the previous digest's chainHead, so the platform can verify continuity (OK/GAP/MISMATCH).",
+  "type": "object",
+  "required": [
+    "protocolVersion",
+    "gatewayId",
+    "periodStart",
+    "periodEnd",
+    "entryCount",
+    "chainHead",
+    "chainPrev"
+  ],
+  "properties": {
+    "protocolVersion": { "type": "string", "enum": ["1"] },
+    "gatewayId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "periodStart": { "type": "string", "format": "date-time" },
+    "periodEnd": { "type": "string", "format": "date-time" },
+    "entryCount": { "type": "integer", "minimum": 0 },
+    "chainHead": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "chainPrev": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}
