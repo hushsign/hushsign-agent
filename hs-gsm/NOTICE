@@ -1,0 +1,23 @@
+HushSign hs-gsm
+===============
+
+This product includes software developed by third parties:
+
+1. SMSLib
+   - Copyright (C) 2002-2010, Thanasis Delenikas, Athens/GREECE
+   - Licensed under the Apache License, Version 2.0
+   - Source: https://github.com/tdelenikas/smslib (dev branch)
+   - Vendored at commit dd3651a4105498032bb14add528ab4362d991823
+   - The vendored subset keeps the GSM 03.40 PDU codec and the AT/modem
+     driver semantics; the Service/queue/threading/routing machinery and
+     the HTTP gateways were pruned. See VENDORING.md for the exact
+     vendoring and edit log.
+
+2. PduUtils Library
+   - Copyright (C) 2008, Ateneo Java Wireless Competency Center/Blueblade
+     Technologies, Philippines
+   - Licensed under the Apache License, Version 2.0
+   - Vendored from the SMSLib repository above (org.ajwcc.pduUtils).
+
+The full text of the Apache License, Version 2.0 is available at:
+http://www.apache.org/licenses/LICENSE-2.0
