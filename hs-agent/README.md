@@ -34,3 +34,16 @@ Tests use `MockConsumer`; the real-broker E2E lands in P1-S13.
 - Fail-closed: if a claim cannot be persisted, it is rolled back and a
   `DedupeException` propagates — a send whose uniqueness cannot be
   guaranteed is never attempted.
+
+## P1-S8 — spool
+
+`com.hushsign.agent.runtime.spool.Spool`:
+
+- Disk-backed FIFO for outbound records (transmission results, heartbeats,
+  digests) when Kafka is unreachable; one JSONL line per record, survives
+  restarts.
+- `flushTo(sender)` publishes oldest-first and stops at the first send
+  failure — the failed record and everything newer stays spooled, so order
+  survives reconnects; successful sends are acked with one atomic rewrite.
+- Fail-closed: an enqueue that cannot be persisted rolls back and throws
+  `SpoolException`; a torn tail after a crash skips only the malformed line.
