@@ -14,11 +14,29 @@ including mid-run transitions.
   POLICY_REJECT (`+CMS ERROR: 304`).
 - `SimulatorApp` — demo runner: `java … SimulatorApp
   [SUCCESS|FAILURE|OFFLINE|POLICY_REJECT] [technique] [destination]`.
+- `SimulatedAgentApp` — P1-S13 Kafka E2E runner: the full agent pipeline
+  (`EmissionConsumer → dedupe → policy → executor → SimModem`) against a real
+  broker. Consumes `hs.emissions.{operator}` (group `gw-{operator}`) and
+  publishes transmissions to `hs.transmissions.v1` through the on-disk spool.
 
 Tests (`SimModemTest`) drive the real `Modem` + `Technique` stack through the
 scenarios and assert state transitions (DEGRADED → ERROR quarantine), PDU
-capture byte-equality, and the whole AT identity surface. P1-S13 will wire
-the simulator to Kafka end-to-end.
+capture byte-equality, and the whole AT identity surface.
+
+## Kafka E2E (P1-S13)
+
+```powershell
+mvnw.cmd -q install -DskipTests
+$env:HS_KAFKA_BOOTSTRAP_SERVERS = 'localhost:9094'   # EXTERNAL listener (host)
+mvnw.cmd -pl simulator exec:java `
+  -Dexec.mainClass=com.hushsign.agent.simulator.SimulatedAgentApp `
+  -Dexec.args="SUCCESS 226-10"
+```
+
+Then produce a schema-valid `EmissionCommand` on `hs.emissions.226-10` and
+watch `hs.transmissions.v1` — outcomes ACCEPTED / FAILED / EXPIRED, keyed by
+emissionId. The agent's spool (`target/sim-agent/spool.jsonl`) survives broker
+outages and flushes in order on reconnect; stop with Ctrl-C.
 
 Run locally (installs snapshots, then runs the demo):
 
