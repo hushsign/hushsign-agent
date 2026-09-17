@@ -87,7 +87,7 @@ public enum Technique {
     private String userData(TechniqueParams params) {
         return switch (this) {
             case SILENT_TP0, WAP_PUSH_EMPTY, MMS_NOTIFY_EMPTY -> {
-                requireParams(params, "none");
+                requireParams(params);
                 yield udTemplate;
             }
             case WAP_PUSH_SL, WAP_PUSH_SI -> {
@@ -114,7 +114,7 @@ public enum Technique {
         };
     }
 
-    private void requireParams(TechniqueParams params, String expected) {
+    private void requireParams(TechniqueParams params) {
         if (params != null && !(params instanceof TechniqueParams.None)) {
             throw new IllegalArgumentException(code + " takes no parameters, got " + params.getClass().getSimpleName());
         }

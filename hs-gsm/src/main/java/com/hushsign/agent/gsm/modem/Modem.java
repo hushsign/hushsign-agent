@@ -130,6 +130,9 @@ public final class Modem implements ModemContext, AutoCloseable {
      * @return the modem message index from {@code +CMGS}, or -1 when refused
      */
     public synchronized int sendPdu(String pduHex) throws ModemException {
+        if (pduHex == null || pduHex.length() % 2 != 0 || !pduHex.matches("[0-9A-Fa-f]+")) {
+            throw new IllegalArgumentException("pduHex must be even-length hex, got '" + pduHex + "'");
+        }
         if (state == ModemState.ERROR) {
             throw new ModemException("modem " + port.name() + " is quarantined (ERROR)");
         }

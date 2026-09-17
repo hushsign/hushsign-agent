@@ -170,4 +170,27 @@ class AgentConfigLoaderTest {
                 """);
         assertThrows(ConfigException.class, () -> AgentConfigLoader.load(file, Map.of()));
     }
+
+    @Test
+    void autoScanFalseRequiresExplicitPorts() throws Exception {
+        Path file = write("""
+                gatewayId: gw-1
+                operators: ["226-10"]
+                modems:
+                  autoScan: false
+                  ports: []
+                """);
+        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(file, Map.of()));
+
+        Path ok = write("""
+                gatewayId: gw-1
+                operators: ["226-10"]
+                modems:
+                  autoScan: false
+                  ports: ["/dev/ttyUSB0"]
+                """);
+        AgentConfig config = AgentConfigLoader.load(ok, Map.of());
+        assertFalse(config.modems().autoScan());
+        assertEquals(List.of("/dev/ttyUSB0"), config.modems().ports());
+    }
 }

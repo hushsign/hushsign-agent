@@ -103,4 +103,15 @@ class ModemTest {
                 "a missing prompt must time out, not hang the send thread");
         assertEquals(ModemState.DEGRADED, modem.state());
     }
+
+    @Test
+    void sendPduRejectsMalformedHex() throws Exception {
+        TestSerialPort port = new TestSerialPort("COM3");
+        Modem modem = openedModem(port, "OK\r\n", "356789123456789\r\nOK\r\n");
+
+        assertThrows(IllegalArgumentException.class, () -> modem.sendPdu("xyz"));
+        assertThrows(IllegalArgumentException.class, () -> modem.sendPdu("001"));
+        assertThrows(IllegalArgumentException.class, () -> modem.sendPdu(null));
+        assertEquals(ModemState.READY, modem.state(), "rejected inputs must not touch modem state");
+    }
 }

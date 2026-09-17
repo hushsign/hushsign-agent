@@ -104,9 +104,9 @@ public final class AgentConfigLoader {
 
         String workDir = str(root, "", "workDir", env, ".");
 
-        Map<String, Object> kafka = section(root, "kafka", env);
+        Map<String, Object> kafka = section(root, "kafka");
         checkKeys(kafka, KAFKA_KEYS, "kafka.");
-        Map<String, Object> security = section(kafka, "security", env);
+        Map<String, Object> security = section(kafka, "security");
         checkKeys(security, SECURITY_KEYS, "kafka.security.");
         KafkaConfig kafkaConfig = new KafkaConfig(
                 str(kafka, "kafka.", "bootstrapServers", env, "localhost:9092"),
@@ -118,11 +118,16 @@ public final class AgentConfigLoader {
                         str(security, "kafka.security.", "saslPassword", env, null),
                         str(security, "kafka.security.", "truststorePath", env, null)));
 
-        Map<String, Object> modems = section(root, "modems", env);
+        Map<String, Object> modems = section(root, "modems");
         checkKeys(modems, MODEMS_KEYS, "modems.");
+        boolean autoScan = bool(modems, "modems.", "autoScan", env, true);
+        List<String> ports = strList(modems, "modems.", "ports", env, List.of());
+        if (!autoScan && ports.isEmpty()) {
+            throw new ConfigException("modems.autoScan is false but modems.ports is empty");
+        }
         ModemsConfig modemsConfig = new ModemsConfig(
-                bool(modems, "modems.", "autoScan", env, true),
-                strList(modems, "modems.", "ports", env, List.of()),
+                autoScan,
+                ports,
                 positive(intVal(modems, "modems.", "baudRate", env, 115_200), "modems.baudRate"),
                 positive(intVal(modems, "modems.", "responseTimeoutMs", env, 30_000), "modems.responseTimeoutMs"),
                 nonNegative(intVal(modems, "modems.", "commandWaitMs", env, 700), "modems.commandWaitMs"),
@@ -130,21 +135,21 @@ public final class AgentConfigLoader {
                 positive(intVal(modems, "modems.", "probeAttempts", env, 3), "modems.probeAttempts"),
                 positive(intVal(modems, "modems.", "maxConsecutiveErrors", env, 3), "modems.maxConsecutiveErrors"));
 
-        Map<String, Object> heartbeat = section(root, "heartbeat", env);
+        Map<String, Object> heartbeat = section(root, "heartbeat");
         checkKeys(heartbeat, HEARTBEAT_KEYS, "heartbeat.");
         HeartbeatConfig heartbeatConfig = new HeartbeatConfig(
                 positive(intVal(heartbeat, "heartbeat.", "intervalSeconds", env, 30), "heartbeat.intervalSeconds"));
 
-        Map<String, Object> dedupe = section(root, "dedupe", env);
+        Map<String, Object> dedupe = section(root, "dedupe");
         checkKeys(dedupe, DEDUPE_KEYS, "dedupe.");
         DedupeConfig dedupeConfig = new DedupeConfig(
                 positive(intVal(dedupe, "dedupe.", "maxEntries", env, 10_000), "dedupe.maxEntries"));
 
-        Map<String, Object> spool = section(root, "spool", env);
+        Map<String, Object> spool = section(root, "spool");
         checkKeys(spool, SPOOL_KEYS, "spool.");
         SpoolConfig spoolConfig = new SpoolConfig(str(spool, "spool.", "path", env, "spool"));
 
-        Map<String, Object> policy = section(root, "policy", env);
+        Map<String, Object> policy = section(root, "policy");
         checkKeys(policy, POLICY_KEYS, "policy.");
         PolicyConfig policyConfig = new PolicyConfig(str(policy, "policy.", "path", env, "policy.yaml"));
 
@@ -156,7 +161,7 @@ public final class AgentConfigLoader {
     // helpers
     // ==================================================
 
-    private static Map<String, Object> section(Map<String, Object> parent, String name, Map<String, String> env) {
+    private static Map<String, Object> section(Map<String, Object> parent, String name) {
         Object value = parent.get(name);
         if (value == null) {
             return Map.of();
