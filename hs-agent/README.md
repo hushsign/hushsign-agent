@@ -47,3 +47,16 @@ Tests use `MockConsumer`; the real-broker E2E lands in P1-S13.
   survives reconnects; successful sends are acked with one atomic rewrite.
 - Fail-closed: an enqueue that cannot be persisted rolls back and throws
   `SpoolException`; a torn tail after a crash skips only the malformed line.
+
+## P1-S9 — heartbeat producer
+
+`com.hushsign.agent.runtime.heartbeat.HeartbeatProducer`:
+
+- Builds a `GatewayHeartbeat` (modems, SIMs, counters, policy/config hashes)
+  from a `HeartbeatSource`, self-validates it against the vendored JSON
+  Schema, and spools it to `hs.fleet.heartbeat.v1` keyed by gatewayId — so
+  heartbeats queue on disk while the broker is down and flush on reconnect.
+- Sequence counts up per pulse; malformed hashes (non-64-hex) and negative
+  counters are refused before anything is spooled.
+- Data minimization: SIM identifiers only as SHA-256 hashes, MSISDN masked
+  (see `Hashes`).
