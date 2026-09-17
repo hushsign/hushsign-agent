@@ -1,0 +1,40 @@
+# HushSign agent configuration (P1-S10). Every key can be overridden with an
+# environment variable (HS_ + underscored path): HS_GATEWAY_ID,
+# HS_KAFKA_BOOTSTRAP_SERVERS, HS_MODEMS_PORTS, HS_DEDUPE_MAX_ENTRIES, ...
+# Secrets (SASL password) must come from the environment, never from this file.
+
+gatewayId: gw-buc-01
+operators: ["226-10"]
+workDir: .
+
+kafka:
+  bootstrapServers: localhost:9092
+  clientId: gw-buc-01
+  security:
+    protocol: PLAINTEXT        # PLAINTEXT | SASL_SSL
+    saslMechanism: SCRAM-SHA-512
+    saslUsername: gw-226-10
+    # saslPassword: set HS_KAFKA_SECURITY_SASL_PASSWORD
+    truststorePath: ""
+
+modems:
+  autoScan: true
+  ports: []                    # when autoScan is false: device paths
+  baudRate: 115200
+  responseTimeoutMs: 30000
+  commandWaitMs: 700
+  pollWaitMs: 200
+  probeAttempts: 3
+  maxConsecutiveErrors: 3
+
+heartbeat:
+  intervalSeconds: 30
+
+dedupe:
+  maxEntries: 10000
+
+spool:
+  path: spool
+
+policy:
+  path: policy.yaml

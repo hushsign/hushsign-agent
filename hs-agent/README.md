@@ -60,3 +60,17 @@ Tests use `MockConsumer`; the real-broker E2E lands in P1-S13.
   counters are refused before anything is spooled.
 - Data minimization: SIM identifiers only as SHA-256 hashes, MSISDN masked
   (see `Hashes`).
+
+## P1-S10 — agent.yaml config
+
+`com.hushsign.agent.config.AgentConfigLoader`:
+
+- Loads `agent.yaml` (example in `src/main/resources/agent.example.yaml`):
+  gateway id, operators, work dir, Kafka (+ SASL security), modem timings,
+  heartbeat interval, dedupe window, spool/policy paths.
+- Missing file → defaults; unknown keys → fail fast; invalid values
+  (negative intervals, bad MCC-MNC, non-booleans) → fail fast.
+- Environment overrides win over the file: `HS_` + underscored path
+  (`HS_GATEWAY_ID`, `HS_KAFKA_BOOTSTRAP_SERVERS`, `HS_DEDUPE_MAX_ENTRIES`,
+  `HS_MODEMS_PORTS` = comma-separated). Secrets (SASL password) come from the
+  environment, never from the file.
