@@ -21,3 +21,41 @@ jobs:
           cache: maven
       - name: Verify
         run: ./mvnw -B verify --no-transfer-progress
+
+  protocol-schemas:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vendored schemas match the vendored manifest
+        run: bash scripts/check-protocol-drift.sh protocol/src/main/resources/protocol/schemas
+
+  protocol-drift:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect platform repo token
+        id: detect
+        env:
+          PLATFORM_REPO_TOKEN: ${{ secrets.PLATFORM_REPO_TOKEN }}
+        run: |
+          if [ -n "$PLATFORM_REPO_TOKEN" ]; then
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check out hushsign-platform (canonical protocol)
+        if: ${{ steps.detect.outputs.has_token == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
+        uses: actions/checkout@v4
+        with:
+          repository: hushsign/hushsign-platform
+          ref: main
+          token: ${{ secrets.PLATFORM_REPO_TOKEN }}
+          path: platform-checkout
+      - name: Full cross-repo drift check
+        if: ${{ steps.detect.outputs.has_token == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
+        run: bash platform-checkout/libs/protocol/scripts/check-agent-protocol-drift.sh .
+      - name: Cross-repo drift check skipped
+        if: ${{ steps.detect.outputs.has_token != 'true' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) }}
+        run: echo "Cross-repo drift check skipped (PLATFORM_REPO_TOKEN not set or fork PR); the platform repo's CI gates drift on its side."
