@@ -1,0 +1,110 @@
+# P1-S14 spike — real modem on the Pi: findings
+
+**Date:** 2026-09-18 · **Status:** spike executed, send blocked by dead SIM reader on the only available stick · **Component:** agent-gsm (`spike`)
+
+## 1. Objective
+
+Send one `SILENT_TP0` with `hs-gsm` through a real Huawei K3765 modem on the field Raspberry Pi, capture it with PduSpy/HushSms on a receiving phone, and record findings.
+
+## 2. Result
+
+**The send could not complete: the K3765's SIM reader is defective.** Every SIM-dependent
+AT command returns `+CME ERROR: 13` ("SIM failure"), and Huawei's own diagnostic confirms
+`^SYSINFO:4,0,0,0,255,,0` → `sim_state=0` (invalid SIM). The failure is **identical on two
+independent stacks** (Linux Pi + usb_modeswitch, Windows 11 + vendor `ew_hwusbdev`/`ewmdm2k`
+drivers), so it is hardware, not software. The SIM itself works in a phone.
+
+The spike nevertheless retired its real risk: **the hs-gsm software pipeline is field-clean**
+(open, init, PDU generation, and now honest error surfacing), and three real defects found
+during the spike are fixed and regression-tested (below).
+
+## 3. Evidence
+
+### 3.1 Modem + serial layer healthy (both OSes)
+
+```
+ATI: Manufacturer: huawei, Model: K3765, Revision: 11.126.03.09.00, IMEI: 351617046662843
+     +GCAP: +CGSM,+FCLASS,+DS   OK
+```
+
+`AT`, `ATI`, `AT+CFUN=1`, `AT+CFUN=1,1` all answer. On Windows the vendor drivers bind all
+interfaces OK (COM6 secondary modem, COM7 modem, COM9 diagnostics; NDIS + storage up).
+
+### 3.2 SIM gate closed everywhere
+
+| Probe | Linux Pi (`/dev/ttyUSB0`) | Windows 11 (COM6/COM7, vendor driver) |
+|---|---|---|
+| `AT+CPIN?` | `+CME ERROR: 13` | `+CME ERROR: SIM failure` |
+| `AT+CIMI` / `AT+CSQ` / `AT+CREG?` / `AT+CMGF?` / `AT+CMGS` | `+CME ERROR: 13` | `+CME ERROR: SIM failure` |
+| `AT^SYSINFO` | `4,0,0,0,255,,0` (sim_state=0) | `4,0,0,0,255,,0` (sim_state=0) |
+
+Physical attempts exhausted: SIM reseat, both tray orientations, cold USB power cycle,
+`AT+CFUN=1`, `AT+CFUN=1,1` full reset — all still `CME 13`. The K3765's blinking-green-every-
+few-seconds LED is the **no-SIM** pattern, not "registered".
+
+### 3.3 hs-gsm on the real modem (after fixes)
+
+```
+== P1-S14 real modem spike: COM6 -> 40756270541
+...
+SPIKE RESULT: FAILED - modem init failed on COM6: SIM status check failed after
+5 attempts, last response: '+CME ERROR: SIM failure'
+```
+
+Before the fixes the same stick reported a misleading `send failed on ttyUSB0`.
+
+## 4. Defects found and fixed (all regression-tested)
+
+1. **`Modem.open` skipped the modem init.** Probe (`AT`/`AT+CGSN`) was the whole story —
+   no SIM/PIN check, no network registration, no PDU-mode switch. A modem that could not
+   read its SIM still claimed `READY`. → `ModemConfig.initializeOnOpen` (default on;
+   `probeOnly()` used by `ModemScanner`), `Modem.open` runs `initializeModem()` fail-closed.
+2. **`AT+CMGS` prompt wait raced the command echo.** The wait ended as soon as the buffer
+   was non-empty (the echo satisfies that immediately) and then wiped everything, including
+   the modem's refusal, with `clearResponses()`. PDU bytes went to a modem that had never
+   sent `>`. → new `waitForPrompt()`: waits for the actual `>` (echo irrelevant), surfaces
+   `+CMS`/`+CME`/`ERROR` refusals verbatim as `ModemException`.
+3. **Refusals were swallowed into a generic "send failed".** The modem's error line was
+   dropped by `getResponse()` and the caller learned nothing. → `lastErrorLine` is recorded
+   (upstream `getResponseData()` semantics unchanged) and the SIM-status give-up names the
+   exact response (`'+CME ERROR: SIM failure'`).
+4. **`clearResponses()` raced the poll reader.** Late-drained bytes could shift the next
+   command's dialogue (test flakiness on fast timings). → clear now settles for one full
+   poll cycle; poll reader interval driven by `ModemConfig.pollWaitMs`.
+5. **`SimModem` answered `AT+CPIN?` with bare `OK`** (no `+CPIN: READY` line), which the
+   real init sequence correctly treats as "no SIM status". → mock now replies like a real
+   modem.
+
+Tests: `ModemTest` +2 (full init sequence incl. PDU-mode + rssi; SIM-failure init fails
+closed and names the refusal), `sendSurfacesTheModemRefusalVerbatim` covers defect 2/3.
+`hs-gsm` + `simulator` suites green (60 + 8).
+
+## 5. Windows bring-up (spike by-product)
+
+- Core Isolation (HVCI) disabled for the test → vendor `ew_hwusbdev.sys` switch filter and
+  `hwdatacard`/`ewusbmdm.sys` serial drivers load. **Re-enable HVCI after testing.**
+- Vendor package `Driver\X64`: `ew_hwusbdev.inf` (mode switch), `ewmdm2k.inf` (modem),
+  `ewser2k.inf` (secondary port), `ewnet.inf` (NDIS) installed via `pnputil /add-driver
+  /install` — the filter auto-switches 1520→1465 on plug.
+- Tooling committed under `agent/scripts/`: `at_probe.py` (Linux), `at_probe_win.py`
+  (Windows, skips BTHENUM ports), `at_huawei_diag.py` (`^SYSINFO`), `switch_dongle.py`
+  (pyusb/libusb control-transfer switch for when no vendor filter is available).
+- Note: the earlier self-signed WinUSB package was removed from the driver store
+  (`pnputil /delete-driver oem60/oem62/oem63.inf`); libusb cannot open the storage-mode
+  device without a WinUSB binding — the vendor filter path is the one to keep.
+
+## 6. Decisions for P7 (field test)
+
+- **Hardware:** obtain a second stick with a healthy SIM reader (any Huawei E3xxx/K37xx or
+  AT-capable GSM modem). The spike runner (`RealModemSpike`) and probes are reusable as-is;
+  only the port changes. Prefer a stick that reports `^SYSINFO sim_state=1` before going
+  field-side.
+- **Process:** run the SIM/network probe **before** the send; only send when `+CPIN: READY`
+  and `^SYSINFO sim_state=1`. The fixed `Modem.open` now enforces exactly this (fail-closed).
+- Keep the green-LED semantics in the runbook: blinking green ≈ no SIM, not "registered".
+
+## 7. Open items
+
+- Re-run the spike on working hardware to complete the P1-S14 acceptance (send + PduSpy/
+  HushSms capture + PDU byte-match vs golden vectors).
+- Re-enable HVCI on the Windows machine after the driver test window.
