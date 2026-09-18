@@ -40,7 +40,10 @@ public final class ModemScanner {
                 continue;
             }
             try {
-                Modem modem = Modem.open(port, config);
+                // Probe-only: scanning must stay cheap; the full modem init
+                // (SIM/PIN, registration, PDU mode) runs when the runtime
+                // claims the modem.
+                Modem modem = Modem.open(port, config.probeOnly());
                 log.info("modem found on {}", portName);
                 return Optional.of(modem); // ownership of the port transfers to the modem
             } catch (ModemException e) {

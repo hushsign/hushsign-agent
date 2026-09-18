@@ -12,6 +12,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import com.hushsign.agent.gsm.modem.ModemContext;
+import com.hushsign.agent.gsm.modem.ModemException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.smslib.core.Capabilities;
@@ -33,6 +34,8 @@ public abstract class AbstractModemDriver
 	OutputStream out = null;
 
 	StringBuffer buffer = new StringBuffer(4096);
+
+	String lastErrorLine = "";
 
 	PollReader pollReader;
 
@@ -185,6 +188,7 @@ public abstract class AbstractModemDriver
 			}
 			if ((line.indexOf("ERROR") == 0) || (line.indexOf("+CMS ERROR") == 0) || (line.indexOf("+CME ERROR") == 0))
 			{
+				this.lastErrorLine = line;
 				logger.error(getPortInfo() + " ERR==> " + line);
 				this.responseOk = false;
 				break;
@@ -216,11 +220,19 @@ public abstract class AbstractModemDriver
 
 	public void clearResponses() throws NumberFormatException, IOException
 	{
-		Common.countSheeps(Integer.valueOf(getModemSettings("wait_unit")) * 1);
-		while (this.buffer.length() > 0)
+		// HushSign: settle before returning — clear until the port stays quiet
+		// for one full poll cycle, so bytes drained late by the poll reader
+		// cannot shift the next command's dialogue (P1-S14 init race).
+		int poll = Integer.valueOf(getModemSettings("poll_reader"));
+		while (true)
 		{
-			this.buffer.delete(0, this.buffer.length());
-			Common.countSheeps(Integer.valueOf(getModemSettings("wait_unit")) * 1);
+			while (this.buffer.length() > 0)
+			{
+				this.buffer.delete(0, this.buffer.length());
+				Common.countSheeps(Integer.valueOf(getModemSettings("wait_unit")) * 1);
+			}
+			Common.countSheeps(poll);
+			if (this.buffer.length() == 0) break;
 		}
 	}
 
@@ -327,11 +339,13 @@ public abstract class AbstractModemDriver
 			clearResponses();
 			atFromModemSettings("pre_pin");
 			Common.countSheeps(Integer.valueOf(getModemSettings("wait_unit")) * Integer.valueOf(getModemSettings("delay_after_pre_pin")));
+			String lastSimStatus = "";
 			while (true)
 			{
 				counter++;
-				if (counter == 5) throw new IOException("Modem does not correspond correctly, giving up...");
+				if (counter == 5) throw new IOException("SIM status check failed after 5 attempts, last response: '" + lastSimStatus + "'");
 				ModemResponse simStatus = atGetSimStatus();
+				lastSimStatus = simStatus.isResponseOk() ? simStatus.getResponseData().trim() : getLastErrorLine();
 				if (simStatus.getResponseData().indexOf("SIM PIN2") >= 0)
 				{
 					if (Common.isNullOrEmpty(this.modem.getSimPin2())) throw new IOException("SIM PIN2 requested but not defined!", null);
@@ -544,16 +558,10 @@ public abstract class AbstractModemDriver
 	{
 		write(String.format("AT+CMGS=%d\r", size), true);
 		// HushSign: bounded prompt wait — a modem that never sends the '>'
-		// prompt must time out, not hang the send thread forever.
-		int wait = Integer.valueOf(getModemSettings("wait_unit"));
-		int timeout = Integer.valueOf(getModemSettings("timeout"));
-		int elapsed = 0;
-		while (this.buffer.length() == 0)
-		{
-			if (elapsed >= timeout) throw new TimeoutException("No '>' prompt from " + getPortInfo());
-			Common.countSheeps(wait);
-			elapsed += wait;
-		}
+		// prompt must time out, not hang the send thread forever. The wait
+		// ends on the prompt itself (never on the command echo), and a modem
+		// refusal (+CMS/+CME ERROR) is surfaced verbatim (P1-S14 field spike).
+		waitForPrompt();
 		Common.countSheeps(Integer.valueOf(getModemSettings("wait_unit")) * Integer.valueOf(getModemSettings("delay_before_send_pdu")));
 		clearResponses();
 		write(pdu, true);
@@ -563,21 +571,46 @@ public abstract class AbstractModemDriver
 		return -1;
 	}
 
+	private void waitForPrompt() throws Exception
+	{
+		int wait = Integer.valueOf(getModemSettings("wait_unit"));
+		int timeout = Integer.valueOf(getModemSettings("timeout"));
+		int elapsed = 0;
+		while (true)
+		{
+			String refusal = findRefusalLine(this.buffer);
+			if (refusal != null) throw new ModemException("modem refused AT+CMGS: " + refusal);
+			if (this.buffer.indexOf(">") >= 0) break;
+			if (elapsed >= timeout) throw new TimeoutException("No '>' prompt from " + getPortInfo());
+			Common.countSheeps(wait);
+			elapsed += wait;
+		}
+	}
+
+	/** Returns the first refusal line (+CMS/+CME ERROR or ERROR) in the buffer, or null. */
+	private String findRefusalLine(StringBuffer buffer)
+	{
+		String s = buffer.toString();
+		int end = s.indexOf("\n");
+		if (end == -1) return null; // no complete line yet — avoid partial matches
+		String line = s.substring(0, end).trim();
+		if (line.startsWith("+CMS ERROR") || line.startsWith("+CME ERROR") || line.startsWith("ERROR")) return line;
+		return null;
+	}
+
+	/** The last ERROR/+CMS ERROR/+CME ERROR line consumed by {@link #getResponse()}, or "". */
+	public String getLastErrorLine()
+	{
+		return this.lastErrorLine;
+	}
+
 	public int atSendTEXTMessage(String recipient, String text) throws Exception
 	{
 		write(String.format("AT+CSCS=\"%s\"\r", this.modem.getDeviceInformation().getEncoding()), true);
 		if (!this.responseOk) throw new Exception("Unsupported encoding: " + this.modem.getDeviceInformation().getEncoding());
 		write(String.format("AT+CMGS=\"%s\"\r", recipient), true);
 		// HushSign: bounded prompt wait (see atSendPDUMessage).
-		int wait = Integer.valueOf(getModemSettings("wait_unit"));
-		int timeout = Integer.valueOf(getModemSettings("timeout"));
-		int elapsed = 0;
-		while (this.buffer.length() == 0)
-		{
-			if (elapsed >= timeout) throw new TimeoutException("No '>' prompt from " + getPortInfo());
-			Common.countSheeps(wait);
-			elapsed += wait;
-		}
+		waitForPrompt();
 		Common.countSheeps(Integer.valueOf(getModemSettings("wait_unit")) * Integer.valueOf(getModemSettings("delay_before_send_pdu")));
 		clearResponses();
 		write(text, true);

@@ -15,10 +15,18 @@ public record ModemConfig(
         int responseTimeoutMs,
         int commandWaitMs,
         int pollWaitMs,
-        int maxConsecutiveErrors) {
+        int maxConsecutiveErrors,
+        boolean initializeOnOpen) {
 
     public static Builder builder(String gatewayId) {
         return new Builder(gatewayId);
+    }
+
+    /** Copy with the full modem init (SIM/PIN, registration, PDU mode) skipped — used by port scanning. */
+    public ModemConfig probeOnly() {
+        return new ModemConfig(gatewayId, simPin, simPin2, baudRate, openTimeoutMs, probeAttempts,
+                probeRetryDelayMs, responseTimeoutMs, commandWaitMs, pollWaitMs,
+                maxConsecutiveErrors, false);
     }
 
     public static final class Builder {
@@ -33,6 +41,7 @@ public record ModemConfig(
         private int commandWaitMs = 700;
         private int pollWaitMs = 200;
         private int maxConsecutiveErrors = 3;
+        private boolean initializeOnOpen = true;
 
         private Builder(String gatewayId) {
             this.gatewayId = gatewayId;
@@ -88,6 +97,17 @@ public record ModemConfig(
             return this;
         }
 
+        /**
+         * Runs the full modem init (SIM/PIN check, network registration,
+         * PDU mode switch) right after the probe. Defaults to {@code true} —
+         * a modem that cannot read its SIM must never look READY. Port
+         * scanning uses {@link ModemConfig#probeOnly()} instead.
+         */
+        public Builder initializeOnOpen(boolean initializeOnOpen) {
+            this.initializeOnOpen = initializeOnOpen;
+            return this;
+        }
+
         public ModemConfig build() {
             if (baudRate <= 0 || openTimeoutMs <= 0 || responseTimeoutMs <= 0 || pollWaitMs <= 0) {
                 throw new IllegalArgumentException("baud/open/response/poll timings must be positive");
@@ -103,7 +123,7 @@ public record ModemConfig(
             }
             return new ModemConfig(gatewayId, simPin, simPin2, baudRate, openTimeoutMs,
                     probeAttempts, probeRetryDelayMs, responseTimeoutMs, commandWaitMs,
-                    pollWaitMs, maxConsecutiveErrors);
+                    pollWaitMs, maxConsecutiveErrors, initializeOnOpen);
         }
     }
 }

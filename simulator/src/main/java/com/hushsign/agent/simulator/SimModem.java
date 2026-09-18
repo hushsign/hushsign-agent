@@ -188,6 +188,8 @@ public final class SimModem implements SerialPort {
             enqueue("OK\r\n");
         } else if (command.startsWith("AT+CGSN")) {
             enqueue(serialNo + "\r\nOK\r\n");
+        } else if (command.startsWith("AT+CPIN?")) {
+            enqueue("+CPIN: READY\r\nOK\r\n");
         } else if (command.startsWith("AT+CMGS=")) {
             awaitingPdu = true;
             currentPdu.setLength(0);

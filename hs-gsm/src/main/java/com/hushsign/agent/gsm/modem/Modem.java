@@ -74,6 +74,18 @@ public final class Modem implements ModemContext, AutoCloseable {
             closeQuietly();
             throw new ModemException("AT+CGSN probe failed on " + port.name(), e);
         }
+
+        if (config.initializeOnOpen()) {
+            try {
+                // P1-S14 field finding: the probe is not enough — a real modem
+                // needs the SIM/PIN check, network registration and PDU-mode
+                // switch before it may claim READY.
+                driver.initializeModem();
+            } catch (Exception e) {
+                closeQuietly();
+                throw new ModemException("modem init failed on " + port.name() + ": " + e.getMessage(), e);
+            }
+        }
         state = ModemState.READY;
     }
 

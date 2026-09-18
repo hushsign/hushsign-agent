@@ -1,9 +1,11 @@
 package com.hushsign.agent.gsm.modem;
 
 import org.junit.jupiter.api.Test;
+import org.smslib.gateway.modem.DeviceInformation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModemTest {
 
@@ -15,6 +17,19 @@ class ModemTest {
                 .probeAttempts(2)
                 .probeRetryDelayMs(10)
                 .maxConsecutiveErrors(3)
+                .initializeOnOpen(false)
+                .build();
+    }
+
+    private static ModemConfig fullInitConfig() {
+        return ModemConfig.builder("gw-test")
+                .responseTimeoutMs(400)
+                .commandWaitMs(10)
+                .pollWaitMs(10)
+                .probeAttempts(2)
+                .probeRetryDelayMs(10)
+                .maxConsecutiveErrors(3)
+                .initializeOnOpen(true)
                 .build();
     }
 
@@ -113,5 +128,91 @@ class ModemTest {
         assertThrows(IllegalArgumentException.class, () -> modem.sendPdu("001"));
         assertThrows(IllegalArgumentException.class, () -> modem.sendPdu(null));
         assertEquals(ModemState.READY, modem.state(), "rejected inputs must not touch modem state");
+    }
+
+    @Test
+    void sendSurfacesTheModemRefusalVerbatim() throws Exception {
+        // P1-S14 field spike: a Huawei K3765 with a dead SIM answers AT+CMGS
+        // with "+CME ERROR: 13" instead of the ">" prompt — the refusal must
+        // reach the caller, not degrade into a generic send failure.
+        TestSerialPort port = new TestSerialPort("COM3");
+        Modem modem = openedModem(port, "OK\r\n", "356789123456789\r\nOK\r\n");
+        port.scriptResponse("+CME ERROR: 13\r\n");
+
+        ModemException failure = assertThrows(ModemException.class, () -> modem.sendPdu("0011"));
+        assertTrue(failure.getMessage().contains("+CME ERROR: 13"),
+                "the modem's refusal must be surfaced: " + failure.getMessage());
+        assertEquals(ModemState.DEGRADED, modem.state());
+    }
+
+    @Test
+    void openRunsTheFullInitSequenceAndSwitchesToPduMode() throws Exception {
+        TestSerialPort port = new TestSerialPort("COM3");
+        port.scriptResponse("OK\r\n");                    // probe: AT
+        port.scriptResponse("356789123456789\r\nOK\r\n"); // probe: CGSN
+        // initializeModem writes AT x4 and ATE0 with skipResponse; each write
+        // still consumes one scripted slot in the fake.
+        port.scriptResponse("");
+        port.scriptResponse("");
+        port.scriptResponse("");
+        port.scriptResponse("");
+        port.scriptResponse("");                          // ATE0 (echo off)
+        port.scriptResponse("SIMCOM\r\nOK\r\n");          // CGMI
+        port.scriptResponse("SIM7600\r\nOK\r\n");         // CGMM
+        port.scriptResponse("");                          // ATE0 again
+        port.scriptResponse("+CPIN: READY\r\nOK\r\n");    // SIM status
+        port.scriptResponse("OK\r\n");                    // CLIP=1
+        port.scriptResponse("OK\r\n");                    // CREG=1
+        port.scriptResponse("OK\r\n");                    // CREG?
+        port.scriptResponse("OK\r\n");                    // CMEE=0
+        port.scriptResponse("OK\r\n");                    // CMGF=0 (PDU mode)
+        port.scriptResponse("OK\r\n");                    // CNMI
+        port.scriptResponse("OK\r\n");                    // CPMS=?
+        port.scriptResponse("SIMCOM\r\nOK\r\n");          // refresh: CGMI
+        port.scriptResponse("SIM7600\r\nOK\r\n");         // refresh: CGMM
+        port.scriptResponse("356789123456789\r\nOK\r\n"); // refresh: CGSN
+        port.scriptResponse("310150123456789\r\nOK\r\n"); // refresh: CIMI
+        port.scriptResponse("SIM7600M2_R01\r\nOK\r\n");   // refresh: CGMR
+        port.scriptResponse("+CSQ: 19,99\r\nOK\r\n");     // refresh: CSQ
+
+        Modem modem = Modem.open(port, fullInitConfig());
+
+        assertEquals(ModemState.READY, modem.state());
+        assertEquals("SIMCOM", modem.getDeviceInformation().getManufacturer());
+        assertEquals("SIM7600", modem.getDeviceInformation().getModel());
+        assertEquals("310150123456789", modem.getDeviceInformation().getImsi());
+        assertEquals(DeviceInformation.Modes.PDU, modem.getDeviceInformation().getMode());
+        assertEquals(-75, modem.getDeviceInformation().getRssi());
+        String tx = port.sentText();
+        assertTrue(tx.contains("AT+CPIN?\r"), "SIM status check: " + tx);
+        assertTrue(tx.contains("AT+CMGF=0\r"), "PDU mode switch: " + tx);
+        assertTrue(port.isOpen());
+    }
+
+    @Test
+    void openFailsWithTheSimStatusWhenTheSimCannotBeRead() throws Exception {
+        // P1-S14 field spike: the Huawei K3765 answers every SIM command with
+        // "+CME ERROR: SIM failure" — the init must fail closed and say why.
+        TestSerialPort port = new TestSerialPort("COM3");
+        port.scriptResponse("OK\r\n");                    // probe: AT
+        port.scriptResponse("356789123456789\r\nOK\r\n"); // probe: CGSN
+        port.scriptResponse("");
+        port.scriptResponse("");
+        port.scriptResponse("");
+        port.scriptResponse("");
+        port.scriptResponse("");                          // ATE0 (echo off)
+        port.scriptResponse("SIMCOM\r\nOK\r\n");          // CGMI
+        port.scriptResponse("SIM7600\r\nOK\r\n");         // CGMM
+        port.scriptResponse("");                          // ATE0 again
+        for (int i = 0; i < 5; i++) {
+            port.scriptResponse("+CME ERROR: SIM failure\r\n"); // CPIN? x5
+        }
+
+        ModemException failure = assertThrows(ModemException.class,
+                () -> Modem.open(port, fullInitConfig()));
+
+        assertTrue(failure.getMessage().contains("+CME ERROR: SIM failure"),
+                "the SIM refusal must be named: " + failure.getMessage());
+        assertEquals(false, port.isOpen(), "a failed init must close the port");
     }
 }

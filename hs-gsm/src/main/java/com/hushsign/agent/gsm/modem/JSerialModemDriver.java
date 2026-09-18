@@ -68,6 +68,7 @@ public final class JSerialModemDriver extends AbstractModemDriver {
             case "timeout" -> Integer.toString(config.responseTimeoutMs());
             case "command_wait_unit" -> Integer.toString(config.commandWaitMs());
             case "wait_unit" -> Integer.toString(config.pollWaitMs());
+            case "poll_reader" -> Integer.toString(config.pollWaitMs());
             case "char_wait_unit" -> "0";
             default -> super.getModemSettings(key);
         };
