@@ -39,8 +39,11 @@ interfaces OK (COM6 secondary modem, COM7 modem, COM9 diagnostics; NDIS + storag
 | `AT^SYSINFO` | `4,0,0,0,255,,0` (sim_state=0) | `4,0,0,0,255,,0` (sim_state=0) |
 
 Physical attempts exhausted: SIM reseat, both tray orientations, cold USB power cycle,
-`AT+CFUN=1`, `AT+CFUN=1,1` full reset — all still `CME 13`. The K3765's blinking-green-every-
-few-seconds LED is the **no-SIM** pattern, not "registered".
+`AT+CFUN=1`, `AT+CFUN=1,1` full reset — all still `CME 13`. Cross-test with a second,
+older SIM (different operator/vintage) on Windows: same `+CME ERROR: SIM failure` and
+`sim_state=0` — ruling out "SIM too new" as the cause. Verdict: the K3765's SIM reader
+is defective. The K3765's blinking-green-every-few-seconds LED is the **no-SIM** pattern,
+not "registered".
 
 ### 3.3 hs-gsm on the real modem (after fixes)
 
