@@ -66,6 +66,13 @@ SPIKE RESULT: sent OK, modem message index=19, state=READY
 
 Captured on the receiving phone with PduSpy — Type-0 silent SMS received.
 
+**Full-catalog sweep (same modem, same destination, `RealModemTechniqueSweep`):**
+all six techniques accepted by the modem — SILENT_TP0 (idx 20), WAP_PUSH_EMPTY (21),
+WAP_PUSH_SL (22), WAP_PUSH_SI (23), MWI_TOGGLE (24), MMS_NOTIFY_EMPTY (25).
+Field-observed effects on a modern phone: Type-0 / empty-WAP / empty-MMS-notify are
+fully silent; WAP SL opens the URL (error toast when unreachable), WAP SI renders as
+a service message, MWI toggles the voicemail icon (reverted with `MWI_OFF`).
+
 **Root cause of the `304` saga:** this firmware accepts `AT+CMGS` only in the
 *PCUI form* — the TPDU as ASCII hex text with the zero-length SMSC octet dropped
 and the length reduced by one. The full-PDU form, binary form, explicit-SMSC form
