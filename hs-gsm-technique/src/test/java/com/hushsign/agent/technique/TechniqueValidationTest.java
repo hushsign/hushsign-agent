@@ -5,6 +5,7 @@ import org.ajwcc.pduUtils.gsm3040.PduParser;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -15,27 +16,12 @@ class TechniqueValidationTest {
     private static final PduParser PARSER = new PduParser();
 
     @Test
-    void parameterShapeMustMatchTheTechnique() {
-        assertThrows(IllegalArgumentException.class,
-                () -> Technique.WAP_PUSH_SL.generate("40756270541", TechniqueParams.None.INSTANCE),
-                "WAP pushes require a scheme");
-        assertThrows(IllegalArgumentException.class,
-                () -> Technique.WAP_PUSH_SI.generate("40756270541",
-                        new TechniqueParams.MwiToggle(true, 1)),
-                "SI must reject MWI params");
-        assertThrows(IllegalArgumentException.class,
-                () -> Technique.MWI_TOGGLE.generate("40756270541", TechniqueParams.None.INSTANCE),
-                "MWI requires toggle params");
-        assertThrows(IllegalArgumentException.class,
-                () -> Technique.SILENT_TP0.generate("40756270541",
-                        new TechniqueParams.WapPush(TechniqueParams.WapScheme.HTTP)),
-                "SILENT_TP0 takes no params");
-        assertThrows(IllegalArgumentException.class,
-                () -> new TechniqueParams.MwiToggle(true, 256),
-                "MWI count must fit one octet");
-        assertThrows(IllegalArgumentException.class,
-                () -> new TechniqueParams.WapPush(null),
-                "scheme must not be null");
+    void catalogTechniquesAreParameterless() {
+        for (Technique technique : Technique.values()) {
+            String hex = technique.generate("40756270541", TechniqueParams.None.INSTANCE);
+            assertFalse(hex.isEmpty(), technique + " must generate with None params");
+        }
+        assertEquals(4, Technique.values().length, "silent-only catalog: Type-0, empty WAP, empty MMS, MWI deactivate");
     }
 
     @Test

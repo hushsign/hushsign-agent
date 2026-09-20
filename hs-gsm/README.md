@@ -46,7 +46,7 @@ Notes on the captures:
 - Generators reproduce the normal/silent captures; for Class 0 the strict
   generator emits UCS2, so only the DCS round-trip is asserted.
 
-Technique generators (SILENT_TP0, WAP_PUSH_EMPTY/SL/SI, MWI_TOGGLE,
-MMS_NOTIFY_EMPTY) live in `hs-gsm-technique` (P1-S4) and are verified
-byte-for-byte against this corpus.
+Technique generators (SILENT_TP0, WAP_PUSH_EMPTY, MMS_NOTIFY_EMPTY,
+MWI_DEACTIVATE) live in `hs-gsm-technique` (P1-S4, silent-only catalog per
+P1-S14) and are verified byte-for-byte against this corpus.
 

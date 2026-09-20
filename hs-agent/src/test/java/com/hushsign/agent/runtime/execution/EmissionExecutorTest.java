@@ -142,15 +142,12 @@ class EmissionExecutorTest {
     }
 
     @Test
-    void allSixCatalogTechniquesExecuteWithoutParams() {
-        String[] techniques = {"SILENT_TP0", "WAP_PUSH_EMPTY", "WAP_PUSH_SL",
-                "WAP_PUSH_SI", "MWI_TOGGLE", "MMS_NOTIFY_EMPTY"};
+    void allCatalogTechniquesExecuteWithoutParams() {
+        String[] techniques = {"SILENT_TP0", "WAP_PUSH_EMPTY", "MMS_NOTIFY_EMPTY", "MWI_DEACTIVATE"};
         String[] ids = {"00000000-0000-4000-8000-000000000001",
                 "00000000-0000-4000-8000-000000000002",
                 "00000000-0000-4000-8000-000000000003",
-                "00000000-0000-4000-8000-000000000004",
-                "00000000-0000-4000-8000-000000000005",
-                "00000000-0000-4000-8000-000000000006"};
+                "00000000-0000-4000-8000-000000000004"};
         for (int i = 0; i < techniques.length; i++) {
             executor.onCommand(command(ids[i], NOW.plusSeconds(600), techniques[i]));
         }

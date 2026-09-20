@@ -22,17 +22,16 @@ public enum Technique {
     /** 0-byte WAP push: port-addressed UDH to the WAP port, one payload octet. */
     WAP_PUSH_EMPTY("wap_push_empty", "0-byte WAP push", 0x61, 0x00, 0x04,
             "0605040B840000" + "00"),
-    /** WAP Push SL (service loading), no/HTTP/HTTPS prefix variants. */
-    WAP_PUSH_SL("wap_push_sl", "WAP Push SL", 0x61, 0x00, 0x04,
-            "0605040B840000" + "DC0605B0AF82B48302066A0085%s03746573742E636F6D000501"),
-    /** WAP Push SI (service indication), no/HTTP/HTTPS prefix variants. */
-    WAP_PUSH_SI("wap_push_si", "WAP Push SI", 0x61, 0x00, 0x04,
-            "0605040B840000" + "DC060DAEAF82B483B173656E6465720002056A0045C6%s03746573742E636F6D0001037375626A656374000101"),
-    /** MWI activation/deactivation via the special-SMS-indication UDH. */
-    MWI_TOGGLE("mwi_toggle", "MWI activation/deactivation", 0x61, 0x00, 0x00, "040102%s"),
     /** Empty MMS notification (WAP push to the MMS port, no attachments). */
     MMS_NOTIFY_EMPTY("mms_notify_empty", "Empty MMS notification", 0x61, 0x00, 0x04,
-            "0605040B840000" + "7C0603BEAF848C969831323334008D93BE3132333400");
+            "0605040B840000" + "7C0603BEAF848C969831323334008D93BE3132333400"),
+    /**
+     * MWI deactivation only (P1-S14 decision): clears the voicemail icon with no
+     * user-visible effect — activation was removed from the catalog because it
+     * produces a visible notification on modern phones.
+     */
+    MWI_DEACTIVATE("mwi_deactivate", "MWI deactivation (voicemail icon clear)", 0x61, 0x00, 0x00,
+            "040102000000");
 
     private static final HexFormat HEX = HexFormat.of().withUpperCase();
 
@@ -85,33 +84,8 @@ public enum Technique {
     }
 
     private String userData(TechniqueParams params) {
-        return switch (this) {
-            case SILENT_TP0, WAP_PUSH_EMPTY, MMS_NOTIFY_EMPTY -> {
-                requireParams(params);
-                yield udTemplate;
-            }
-            case WAP_PUSH_SL, WAP_PUSH_SI -> {
-                if (!(params instanceof TechniqueParams.WapPush wap)) {
-                    throw new IllegalArgumentException(code + " expects WapPush params");
-                }
-                String prefix = switch (wap.scheme()) {
-                    case NONE -> this == WAP_PUSH_SL ? "08" : "0B";
-                    case HTTP -> this == WAP_PUSH_SL ? "09" : "0C";
-                    case HTTPS -> this == WAP_PUSH_SL ? "0B" : "0E";
-                };
-                yield udTemplate.formatted(prefix);
-            }
-            case MWI_TOGGLE -> {
-                if (!(params instanceof TechniqueParams.MwiToggle mwi)) {
-                    throw new IllegalArgumentException(code + " expects MwiToggle params");
-                }
-                String storeCount = mwi.active()
-                        ? "80" + HEX.toHexDigits((byte) mwi.count())
-                        : "0000";
-                String tail = mwi.active() ? "01" : "00";
-                yield udTemplate.formatted(storeCount) + tail;
-            }
-        };
+        requireParams(params);
+        return udTemplate;
     }
 
     private void requireParams(TechniqueParams params) {

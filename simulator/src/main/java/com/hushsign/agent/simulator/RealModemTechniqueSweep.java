@@ -23,7 +23,6 @@ public final class RealModemTechniqueSweep {
     public static void main(String[] args) throws Exception {
         String port = args.length > 0 ? args[0] : "COM6";
         String destination = args.length > 1 ? args[1] : "40756270541";
-        boolean mwiOff = args.length > 2 && args[2].equalsIgnoreCase("MWI_OFF");
 
         ModemConfig config = ModemConfig.builder("pi-gw-01")
                 .baudRate(115200)
@@ -39,18 +38,9 @@ public final class RealModemTechniqueSweep {
 
         try (Modem modem = Modem.open(new JSerialCommPortFactory().open(port), config)) {
             System.out.println("modem open on " + port + ", state=" + modem.state());
-            if (mwiOff) {
-                String pdu = Technique.MWI_TOGGLE.generate(destination,
-                        new TechniqueParams.MwiToggle(false, 1));
-                int index = modem.sendPdu(pdu);
-                System.out.println("MWI_TOGGLE(deactivate) PDU (" + pdu.length() / 2
-                        + " octets): " + pdu + " -> index=" + index);
-                System.out.println("SWEEP RESULT: MWI deactivation sent, state=" + modem.state());
-                return;
-            }
             int sent = 0;
             for (Technique technique : Technique.values()) {
-                String pdu = technique.generate(destination, defaultParams(technique));
+                String pdu = technique.generate(destination, TechniqueParams.None.INSTANCE);
                 int index = modem.sendPdu(pdu);
                 System.out.println(technique + " PDU (" + pdu.length() / 2 + " octets): "
                         + pdu + " -> index=" + index);
@@ -63,14 +53,5 @@ public final class RealModemTechniqueSweep {
             System.out.println("SWEEP RESULT: FAILED - " + e.getMessage());
             System.exit(2);
         }
-    }
-
-    private static TechniqueParams defaultParams(Technique technique) {
-        return switch (technique) {
-            case WAP_PUSH_SL -> new TechniqueParams.WapPush(TechniqueParams.WapScheme.HTTPS);
-            case WAP_PUSH_SI -> new TechniqueParams.WapPush(TechniqueParams.WapScheme.HTTP);
-            case MWI_TOGGLE -> new TechniqueParams.MwiToggle(true, 1);
-            default -> TechniqueParams.None.INSTANCE;
-        };
     }
 }

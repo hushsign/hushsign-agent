@@ -158,18 +158,12 @@ class SimModemTest {
         try (Modem modem = Modem.open(sim, fastConfig())) {
             modem.sendPdu(Technique.SILENT_TP0.generate(DESTINATION, null));
             modem.sendPdu(Technique.WAP_PUSH_EMPTY.generate(DESTINATION, null));
-            modem.sendPdu(Technique.WAP_PUSH_SL.generate(DESTINATION,
-                    new TechniqueParams.WapPush(TechniqueParams.WapScheme.HTTPS)));
-            modem.sendPdu(Technique.WAP_PUSH_SI.generate(DESTINATION,
-                    new TechniqueParams.WapPush(TechniqueParams.WapScheme.HTTP)));
-            modem.sendPdu(Technique.MWI_TOGGLE.generate(DESTINATION,
-                    new TechniqueParams.MwiToggle(true, 123)));
             modem.sendPdu(Technique.MMS_NOTIFY_EMPTY.generate(DESTINATION, null));
+            modem.sendPdu(Technique.MWI_DEACTIVATE.generate(DESTINATION, null));
             assertEquals(ModemState.READY, modem.state());
         }
-        assertEquals(6, sim.receivedPdus().size());
-        assertEquals(Technique.WAP_PUSH_SL.generate(DESTINATION,
-                        new TechniqueParams.WapPush(TechniqueParams.WapScheme.HTTPS)),
-                sim.receivedPdus().get(2));
+        assertEquals(4, sim.receivedPdus().size());
+        assertEquals(Technique.SILENT_TP0.generate(DESTINATION, null),
+                sim.receivedPdus().get(0));
     }
 }

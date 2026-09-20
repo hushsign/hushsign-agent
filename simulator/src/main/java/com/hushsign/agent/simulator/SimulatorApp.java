@@ -54,11 +54,7 @@ public final class SimulatorApp {
     }
 
     private static TechniqueParams defaultParams(Technique technique) {
-        return switch (technique) {
-            case SILENT_TP0, WAP_PUSH_EMPTY, MMS_NOTIFY_EMPTY -> TechniqueParams.None.INSTANCE;
-            case WAP_PUSH_SL, WAP_PUSH_SI ->
-                    new TechniqueParams.WapPush(TechniqueParams.WapScheme.NONE);
-            case MWI_TOGGLE -> new TechniqueParams.MwiToggle(true, 1);
-        };
+        // P1-S14: the silent-only catalog is parameterless.
+        return TechniqueParams.None.INSTANCE;
     }
 }
