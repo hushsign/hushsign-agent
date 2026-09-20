@@ -64,9 +64,13 @@ SPIKE RESULT: FAILED - modem COM7 rejected the PDU
 ```
 
 PDU-mode rejection matrix on stick #2 (all `+CMS ERROR: 304`): full PDU SMSC=00,
-explicit-SMSC PDU, MR=01, echo-off, TPDU-only length, after `AT+CSMS=1` and
-`AT+CPMS="SM","SM","SM"`. Text mode: accepted. Conclusion: firmware cannot submit
-PDU-mode SMS — silent SMS impossible on this unit.
+explicit-SMSC PDU, MR=01, echo-off, TPDU-only length, FO=0x11 with relative validity
+(VPF=10), after `AT+CSMS=1` and `AT+CPMS="SM","SM","SM"`. Mode switch is honest
+(`AT+CMGF=0` sticks and reads back 0 — no text-mode pinning). Text mode: accepted.
+Re-flashing the stick did not change the revision string (`11.126.03.07.00`) nor the
+behaviour (the only visible change is the PDU bytes now being echoed before the 304).
+Conclusion: this firmware family cannot submit PDU-mode SMS — silent SMS is
+impossible on the K3765 units available.
 
 Before the fixes the same stick reported a misleading `send failed on ttyUSB0`.
 
