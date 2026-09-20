@@ -146,6 +146,25 @@ class ModemTest {
     }
 
     @Test
+    void splitResponseFramesDoNotCorruptTheDialogue() throws Exception {
+        // P1-S14 field spike on Windows: the vendor serial driver delivers
+        // '\r', '\n' and the next line in separate chunks. The legacy
+        // delete(line.length() + 2) ate the first byte of the next line
+        // ("OK" became "K") and the probe failed. Chunked frames must parse.
+        TestSerialPort port = new TestSerialPort("COM3");
+        Modem modem = openedModem(port, "OK\r\n", "356789123456789\r\nOK\r\n");
+        port.scriptResponse("> ");
+        port.scriptResponse("");
+        port.dripBytes(15);
+        port.scriptResponse("+CMGS: 4\r\nOK\r\n");
+
+        int index = modem.sendPdu("0011000B916407211112F20000FF04D4E2940A");
+
+        assertEquals(4, index, "the +CMGS index must survive split frames");
+        assertEquals(ModemState.READY, modem.state());
+    }
+
+    @Test
     void openRunsTheFullInitSequenceAndSwitchesToPduMode() throws Exception {
         TestSerialPort port = new TestSerialPort("COM3");
         port.scriptResponse("OK\r\n");                    // probe: AT

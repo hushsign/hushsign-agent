@@ -142,7 +142,15 @@ public abstract class AbstractModemDriver
 		{
 			String line = getLineFromBuffer();
 			logger.debug(getPortInfo() + " >>> " + line);
-			this.buffer.delete(0, line.length() + 2);
+			// HushSign: consume exactly the line plus the terminator bytes that
+			// are present RIGHT NOW. The legacy delete(0, line.length() + 2)
+			// assumes \r\n arrived as one unit; on real Windows serial ports the
+			// poll reader can append '\r' and '\n' (and the next line's first
+			// character) in separate chunks — the fixed-size delete then ate
+			// the first byte of the next line (P1-S14: 'OK' became 'K').
+			this.buffer.delete(0, line.length());
+			if (this.buffer.length() > 0 && this.buffer.charAt(0) == '\r') this.buffer.deleteCharAt(0);
+			if (this.buffer.length() > 0 && this.buffer.charAt(0) == '\n') this.buffer.deleteCharAt(0);
 			if (Common.isNullOrEmpty(line)) continue;
 			if (line.charAt(0) == '^') continue;
 			if (line.charAt(0) == '*') continue;

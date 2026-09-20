@@ -92,7 +92,25 @@ final class TestSerialPort implements SerialPort {
     @Override
     public int readByte() {
         Byte b = rx.poll();
+        if (b != null && dripNanos > 0) {
+            try {
+                Thread.sleep(dripNanos / 1_000_000L, (int) (dripNanos % 1_000_000L));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
         return b == null ? -1 : b & 0xFF;
+    }
+
+    private long dripNanos;
+
+    /**
+     * Drips response bytes one at a time with the given delay — simulates a
+     * real Windows serial port whose frames arrive in chunks (P1-S14: the
+     * vendor driver delivered '\r', '\n' and the next line separately).
+     */
+    void dripBytes(long delayMs) {
+        this.dripNanos = delayMs * 1_000_000L;
     }
 
     @Override
