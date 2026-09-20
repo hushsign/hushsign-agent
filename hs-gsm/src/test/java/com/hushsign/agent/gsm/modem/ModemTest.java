@@ -165,6 +165,36 @@ class ModemTest {
     }
 
     @Test
+    void tpduHexSubmissionDropsTheSmscOctet() throws Exception {
+        // P1-S14: the Huawei K3765 firmware accepts AT+CMGS only with the
+        // TPDU (zero-length SMSC octet dropped) and the shortened length —
+        // the full form is rejected with +CMS ERROR: 304.
+        TestSerialPort port = new TestSerialPort("COM3");
+        port.scriptResponse("OK\r\n");
+        port.scriptResponse("356789123456789\r\nOK\r\n");
+
+        Modem modem = Modem.open(port, ModemConfig.builder("gw-test")
+                .responseTimeoutMs(400)
+                .commandWaitMs(10)
+                .pollWaitMs(10)
+                .probeAttempts(2)
+                .probeRetryDelayMs(10)
+                .maxConsecutiveErrors(3)
+                .initializeOnOpen(false)
+                .pduSubmission(PduSubmission.TPDU_HEX)
+                .build());
+        port.scriptResponse("> ");
+        port.scriptResponse("");
+        port.scriptResponse("+CMGS: 4,\r\nOK\r\n"); // trailing comma like the K3765
+
+        int index = modem.sendPdu("0011");
+
+        assertEquals(4, index, "the index must survive the dangling comma");
+        assertTrue(port.sentText().startsWith("AT\rAT+CGSN\rAT+CMGS=1\r11"),
+                "TPDU-only wire format: " + port.sentText());
+    }
+
+    @Test
     void openRunsTheFullInitSequenceAndSwitchesToPduMode() throws Exception {
         TestSerialPort port = new TestSerialPort("COM3");
         port.scriptResponse("OK\r\n");                    // probe: AT

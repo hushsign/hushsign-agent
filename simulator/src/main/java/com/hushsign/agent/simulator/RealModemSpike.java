@@ -3,6 +3,7 @@ package com.hushsign.agent.simulator;
 import com.hushsign.agent.gsm.modem.Modem;
 import com.hushsign.agent.gsm.modem.ModemConfig;
 import com.hushsign.agent.gsm.modem.ModemException;
+import com.hushsign.agent.gsm.modem.PduSubmission;
 import com.hushsign.agent.gsm.serial.JSerialCommPortFactory;
 import com.hushsign.agent.gsm.serial.SerialPort;
 import com.hushsign.agent.technique.Technique;
@@ -35,6 +36,9 @@ public final class RealModemSpike {
                 .probeAttempts(3)
                 .probeRetryDelayMs(500)
                 .maxConsecutiveErrors(3)
+                // P1-S14: the Huawei K3765 family rejects the full PDU form
+                // with +CMS ERROR: 304 — it wants TPDU-only hex submission.
+                .pduSubmission(PduSubmission.TPDU_HEX)
                 .build();
 
         SerialPort serial = new JSerialCommPortFactory().open(port);

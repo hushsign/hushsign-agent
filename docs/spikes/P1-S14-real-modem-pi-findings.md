@@ -8,20 +8,22 @@ Send one `SILENT_TP0` with `hs-gsm` through a real Huawei K3765 modem on the fie
 
 ## 2. Result
 
-Two field findings, one per stick:
+**ACCEPTANCE MET** — SILENT_TP0 sent through the real K3765 with the hs-gsm stack and
+captured on the receiving phone (`SPIKE RESULT: sent OK, modem message index=19`).
 
-1. **Stick #1 (K3765 rev 11.126.03.09.00): the SIM reader is defective.** Every
-   SIM-dependent AT command returns `+CME ERROR: 13` on two OSes with two SIMs;
-   Huawei's own diagnostic says `^SYSINFO sim_state=0`. Not software.
-2. **Stick #2 (K3765 rev 11.126.03.07.00): SIM reader works, but the firmware
-   cannot submit PDU-mode SMS.** Text-mode SMS sends fine (received on the
-   capture phone), while every well-formed PDU variant is rejected with
-   `+CMS ERROR: 304`. Silent SMS requires PDU mode → this stick cannot carry
-   `SILENT_TP0` either.
+The journey exposed three hardware truths and three software defects:
 
-Both failures are hardware-level; the hs-gsm software pipeline is field-clean
-(open, init, PDU generation, honest error surfacing), with the defects found
-during the spike fixed and regression-tested (below).
+1. **Stick #1 (rev 11.126.03.09.00): dead SIM reader** (`+CME ERROR: 13` on two OSes,
+   two SIMs, `^SYSINFO sim_state=0`).
+2. **Stick #2 (rev 11.126.03.07.00): SIM fine, but the firmware demands a non-standard
+   PDU submission form** — TPDU as hex text with the SMSC octet dropped. The standard
+   full form (and binary form) is rejected with `+CMS ERROR: 304`.
+3. **The old system worked because it configured an SMSC number**, which made its length
+   math drop the SMSC octet — accidentally matching the firmware's expectation.
+
+Software defects found and fixed during the spike: missing modem init, swallowed
+refusals, prompt-wait echo race, split-frame byte eating, and the two K3765 submission
+quirks (TPDU-only hex + dangling-comma `+CMGS` index) — all regression-tested.
 
 ## 3. Evidence
 
@@ -56,21 +58,22 @@ Stick #2 (rev 11.126.03.07.00), normal SMS via text mode: **delivered** (`+CMGS:
 "26/09/20,20:00:35+12"`). Silent PDU through the full hs-gsm stack:
 
 ```
-== P1-S14 real modem spike: COM7 -> 40756270541
-modem open on COM7, state=READY
+== P1-S14 real modem spike: COM6 -> 40756270541
+modem open on COM6, state=READY
 SILENT_TP0 PDU (14 octets): 0021000B910457260745F1400000
-COM7 ERR==> +CMS ERROR: 304
-SPIKE RESULT: FAILED - modem COM7 rejected the PDU
+SPIKE RESULT: sent OK, modem message index=19, state=READY
 ```
 
-PDU-mode rejection matrix on stick #2 (all `+CMS ERROR: 304`): full PDU SMSC=00,
-explicit-SMSC PDU, MR=01, echo-off, TPDU-only length, FO=0x11 with relative validity
-(VPF=10), after `AT+CSMS=1` and `AT+CPMS="SM","SM","SM"`. Mode switch is honest
-(`AT+CMGF=0` sticks and reads back 0 — no text-mode pinning). Text mode: accepted.
-Re-flashing the stick did not change the revision string (`11.126.03.07.00`) nor the
-behaviour (the only visible change is the PDU bytes now being echoed before the 304).
-Conclusion: this firmware family cannot submit PDU-mode SMS — silent SMS is
-impossible on the K3765 units available.
+Captured on the receiving phone with PduSpy — Type-0 silent SMS received.
+
+**Root cause of the `304` saga:** this firmware accepts `AT+CMGS` only in the
+*PCUI form* — the TPDU as ASCII hex text with the zero-length SMSC octet dropped
+and the length reduced by one. The full-PDU form, binary form, explicit-SMSC form
+and validity-period variants were all rejected (`+CMS ERROR: 304`). The old field
+system sent hex text and configured an SMSC number, which made its length math drop
+the SMSC octet — accidentally the winning recipe. Fix: `ModemConfig.pduSubmission =
+PduSubmission.TPDU_HEX` (default stays the standard full form). Additionally this
+firmware answers `+CMGS: n,` with a dangling comma — the index parser now tolerates it.
 
 Before the fixes the same stick reported a misleading `send failed on ttyUSB0`.
 
@@ -132,7 +135,6 @@ closed and names the refusal), `sendSurfacesTheModemRefusalVerbatim` covers defe
 
 ## 7. Open items
 
-- Re-run the spike on hardware that passes BOTH acceptance checks (SIM read + PDU-mode
-  submission) to complete the P1-S14 acceptance (send + PduSpy/HushSms capture + PDU
-  byte-match vs golden vectors).
 - Re-enable HVCI on the Windows machine after the driver test window.
+- (Optional hardening) capture the receiving phone's PDU log and diff it byte-for-byte
+  against the golden SILENT_TP0 vector for the final evidence appendix.

@@ -16,7 +16,8 @@ public record ModemConfig(
         int commandWaitMs,
         int pollWaitMs,
         int maxConsecutiveErrors,
-        boolean initializeOnOpen) {
+        boolean initializeOnOpen,
+        PduSubmission pduSubmission) {
 
     public static Builder builder(String gatewayId) {
         return new Builder(gatewayId);
@@ -26,7 +27,7 @@ public record ModemConfig(
     public ModemConfig probeOnly() {
         return new ModemConfig(gatewayId, simPin, simPin2, baudRate, openTimeoutMs, probeAttempts,
                 probeRetryDelayMs, responseTimeoutMs, commandWaitMs, pollWaitMs,
-                maxConsecutiveErrors, false);
+                maxConsecutiveErrors, false, pduSubmission);
     }
 
     public static final class Builder {
@@ -42,6 +43,7 @@ public record ModemConfig(
         private int pollWaitMs = 200;
         private int maxConsecutiveErrors = 3;
         private boolean initializeOnOpen = true;
+        private PduSubmission pduSubmission = PduSubmission.FULL_HEX;
 
         private Builder(String gatewayId) {
             this.gatewayId = gatewayId;
@@ -108,6 +110,17 @@ public record ModemConfig(
             return this;
         }
 
+        /**
+         * PDU wire format for {@code AT+CMGS} (P1-S14): {@link PduSubmission#TPDU_HEX}
+         * drops the zero-length SMSC octet and shortens the length — required
+         * by the Huawei K3765 firmware family, which rejects the full form
+         * with {@code +CMS ERROR: 304}.
+         */
+        public Builder pduSubmission(PduSubmission pduSubmission) {
+            this.pduSubmission = pduSubmission;
+            return this;
+        }
+
         public ModemConfig build() {
             if (baudRate <= 0 || openTimeoutMs <= 0 || responseTimeoutMs <= 0 || pollWaitMs <= 0) {
                 throw new IllegalArgumentException("baud/open/response/poll timings must be positive");
@@ -123,7 +136,7 @@ public record ModemConfig(
             }
             return new ModemConfig(gatewayId, simPin, simPin2, baudRate, openTimeoutMs,
                     probeAttempts, probeRetryDelayMs, responseTimeoutMs, commandWaitMs,
-                    pollWaitMs, maxConsecutiveErrors, initializeOnOpen);
+                    pollWaitMs, maxConsecutiveErrors, initializeOnOpen, pduSubmission);
         }
     }
 }

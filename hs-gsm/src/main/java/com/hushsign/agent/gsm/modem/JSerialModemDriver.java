@@ -26,6 +26,7 @@ public final class JSerialModemDriver extends AbstractModemDriver {
         super(modem);
         this.port = port;
         this.config = config;
+        setPduSubmission(config.pduSubmission());
     }
 
     @Override

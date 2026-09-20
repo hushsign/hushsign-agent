@@ -13,6 +13,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import com.hushsign.agent.gsm.modem.ModemContext;
 import com.hushsign.agent.gsm.modem.ModemException;
+import com.hushsign.agent.gsm.modem.PduSubmission;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.smslib.core.Capabilities;
@@ -564,7 +565,17 @@ public abstract class AbstractModemDriver
 
 	public int atSendPDUMessage(int size, String pdu) throws Exception
 	{
-		write(String.format("AT+CMGS=%d\r", size), true);
+		// HushSign (P1-S14): Huawei K3765-class firmware rejects the full PDU
+		// with +CMS ERROR: 304 and wants the TPDU (SMSC octet dropped) as hex
+		// text with the shortened length.
+		int wireSize = size;
+		String body = pdu;
+		if (this.pduSubmission == PduSubmission.TPDU_HEX && pdu.startsWith("00"))
+		{
+			wireSize = size - 1;
+			body = pdu.substring(2);
+		}
+		write(String.format("AT+CMGS=%d\r", wireSize), true);
 		// HushSign: bounded prompt wait — a modem that never sends the '>'
 		// prompt must time out, not hang the send thread forever. The wait
 		// ends on the prompt itself (never on the command echo), and a modem
@@ -572,11 +583,28 @@ public abstract class AbstractModemDriver
 		waitForPrompt();
 		Common.countSheeps(Integer.valueOf(getModemSettings("wait_unit")) * Integer.valueOf(getModemSettings("delay_before_send_pdu")));
 		clearResponses();
-		write(pdu, true);
+		write(body, true);
 		write((byte) 26);
 		String response = getResponse();
-		if (this.responseOk) return Integer.parseInt(response.substring(response.indexOf(":") + 1).trim());
+		if (this.responseOk) return parseMessageIndex(response);
 		return -1;
+	}
+
+	/** Parses {@code +CMGS: n[, ...]} — Huawei K3765 firmware appends a dangling comma. */
+	private int parseMessageIndex(String response) throws NumberFormatException
+	{
+		String token = response.substring(response.indexOf(":") + 1).trim();
+		int comma = token.indexOf(',');
+		if (comma >= 0) token = token.substring(0, comma).trim();
+		if (token.isEmpty()) return -1;
+		return Integer.parseInt(token);
+	}
+
+	protected PduSubmission pduSubmission = PduSubmission.FULL_HEX;
+
+	public void setPduSubmission(PduSubmission pduSubmission)
+	{
+		this.pduSubmission = pduSubmission;
 	}
 
 	private void waitForPrompt() throws Exception
@@ -624,7 +652,7 @@ public abstract class AbstractModemDriver
 		write(text, true);
 		write((byte) 26);
 		String response = getResponse();
-		if (this.responseOk) return Integer.parseInt(response.substring(response.indexOf(":") + 1).trim());
+		if (this.responseOk) return parseMessageIndex(response);
 		return -1;
 	}
 
