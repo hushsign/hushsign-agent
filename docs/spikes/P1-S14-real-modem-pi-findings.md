@@ -8,15 +8,20 @@ Send one `SILENT_TP0` with `hs-gsm` through a real Huawei K3765 modem on the fie
 
 ## 2. Result
 
-**The send could not complete: the K3765's SIM reader is defective.** Every SIM-dependent
-AT command returns `+CME ERROR: 13` ("SIM failure"), and Huawei's own diagnostic confirms
-`^SYSINFO:4,0,0,0,255,,0` → `sim_state=0` (invalid SIM). The failure is **identical on two
-independent stacks** (Linux Pi + usb_modeswitch, Windows 11 + vendor `ew_hwusbdev`/`ewmdm2k`
-drivers), so it is hardware, not software. The SIM itself works in a phone.
+Two field findings, one per stick:
 
-The spike nevertheless retired its real risk: **the hs-gsm software pipeline is field-clean**
-(open, init, PDU generation, and now honest error surfacing), and three real defects found
-during the spike are fixed and regression-tested (below).
+1. **Stick #1 (K3765 rev 11.126.03.09.00): the SIM reader is defective.** Every
+   SIM-dependent AT command returns `+CME ERROR: 13` on two OSes with two SIMs;
+   Huawei's own diagnostic says `^SYSINFO sim_state=0`. Not software.
+2. **Stick #2 (K3765 rev 11.126.03.07.00): SIM reader works, but the firmware
+   cannot submit PDU-mode SMS.** Text-mode SMS sends fine (received on the
+   capture phone), while every well-formed PDU variant is rejected with
+   `+CMS ERROR: 304`. Silent SMS requires PDU mode → this stick cannot carry
+   `SILENT_TP0` either.
+
+Both failures are hardware-level; the hs-gsm software pipeline is field-clean
+(open, init, PDU generation, honest error surfacing), with the defects found
+during the spike fixed and regression-tested (below).
 
 ## 3. Evidence
 
@@ -47,12 +52,21 @@ not "registered".
 
 ### 3.3 hs-gsm on the real modem (after fixes)
 
+Stick #2 (rev 11.126.03.07.00), normal SMS via text mode: **delivered** (`+CMGS: 9,
+"26/09/20,20:00:35+12"`). Silent PDU through the full hs-gsm stack:
+
 ```
-== P1-S14 real modem spike: COM6 -> 40756270541
-...
-SPIKE RESULT: FAILED - modem init failed on COM6: SIM status check failed after
-5 attempts, last response: '+CME ERROR: SIM failure'
+== P1-S14 real modem spike: COM7 -> 40756270541
+modem open on COM7, state=READY
+SILENT_TP0 PDU (14 octets): 0021000B910457260745F1400000
+COM7 ERR==> +CMS ERROR: 304
+SPIKE RESULT: FAILED - modem COM7 rejected the PDU
 ```
+
+PDU-mode rejection matrix on stick #2 (all `+CMS ERROR: 304`): full PDU SMSC=00,
+explicit-SMSC PDU, MR=01, echo-off, TPDU-only length, after `AT+CSMS=1` and
+`AT+CPMS="SM","SM","SM"`. Text mode: accepted. Conclusion: firmware cannot submit
+PDU-mode SMS — silent SMS impossible on this unit.
 
 Before the fixes the same stick reported a misleading `send failed on ttyUSB0`.
 
@@ -98,16 +112,23 @@ closed and names the refusal), `sendSurfacesTheModemRefusalVerbatim` covers defe
 
 ## 6. Decisions for P7 (field test)
 
-- **Hardware:** obtain a second stick with a healthy SIM reader (any Huawei E3xxx/K37xx or
-  AT-capable GSM modem). The spike runner (`RealModemSpike`) and probes are reusable as-is;
-  only the port changes. Prefer a stick that reports `^SYSINFO sim_state=1` before going
-  field-side.
-- **Process:** run the SIM/network probe **before** the send; only send when `+CPIN: READY`
-  and `^SYSINFO sim_state=1`. The fixed `Modem.open` now enforces exactly this (fail-closed).
+- **Hardware acceptance test is now two-step.** Before buying/using any stick:
+  1. SIM check — `AT+CPIN?` → `+CPIN: READY` and `AT^SYSINFO` → `sim_state` ≠ 0.
+  2. **PDU-mode check** — submit a normal SMS PDU via `AT+CMGS` in PDU mode;
+     `+CMS ERROR: 304` on all PDU variants = firmware can't do PDU mode =
+     cannot carry silent SMS. `scripts/send_sms.py` / `scripts/pdu_variants.py`
+     automate both.
+- Prefer Huawei **E3372/E3531/K3770** (newer firmware, PDU mode reliable); the
+  K3765 family has now failed two independent ways (dead SIM reader, broken
+  PDU submission).
+- **Process:** run the SIM/network probe before the send; only send when
+  `+CPIN: READY` and `^SYSINFO sim_state` ≠ 0. The fixed `Modem.open` enforces
+  this (fail-closed).
 - Keep the green-LED semantics in the runbook: blinking green ≈ no SIM, not "registered".
 
 ## 7. Open items
 
-- Re-run the spike on working hardware to complete the P1-S14 acceptance (send + PduSpy/
-  HushSms capture + PDU byte-match vs golden vectors).
+- Re-run the spike on hardware that passes BOTH acceptance checks (SIM read + PDU-mode
+  submission) to complete the P1-S14 acceptance (send + PduSpy/HushSms capture + PDU
+  byte-match vs golden vectors).
 - Re-enable HVCI on the Windows machine after the driver test window.
