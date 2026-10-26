@@ -12,7 +12,7 @@ import com.hushsign.agent.technique.TechniqueParams;
  * like the future agent will, printing the AT exchange and the outcome.
  *
  * <p>Usage: {@code java ... SimulatorApp [SUCCESS|FAILURE|OFFLINE|POLICY_REJECT]
- * [SILENT_TP0|WAP_PUSH_EMPTY|WAP_PUSH_SL|WAP_PUSH_SI|MWI_TOGGLE|MMS_NOTIFY_EMPTY]
+ * [SILENT_TP0|WAP_PUSH_EMPTY|MMS_NOTIFY_EMPTY|MWI_DEACTIVATE]
  * [destination-digits]}
  */
 public final class SimulatorApp {
@@ -22,7 +22,8 @@ public final class SimulatorApp {
 
     public static void main(String[] args) throws Exception {
         SimScenario scenario = args.length > 0 ? SimScenario.valueOf(args[0].toUpperCase()) : SimScenario.SUCCESS;
-        Technique technique = args.length > 1 ? Technique.valueOf(args[1].toUpperCase()) : Technique.SILENT_TP0;
+        Technique technique = args.length > 1
+                ? Technique.fromWireCode(args[1]) : Technique.SILENT_TP0;
         String destination = args.length > 2 ? args[2] : "40756270541";
 
         SimModem sim = new SimModem("SIM0", scenario);

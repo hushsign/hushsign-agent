@@ -5,6 +5,7 @@ import com.hushsign.agent.runtime.kafka.EmissionHandler;
 import com.hushsign.agent.runtime.transmission.TransmissionProducer;
 import com.hushsign.agent.technique.Technique;
 import com.hushsign.agent.technique.TechniqueParams;
+import com.hushsign.protocol.ProtocolJson;
 import com.hushsign.protocol.v1.EmissionCommand;
 import com.hushsign.protocol.v1.TransmissionResult;
 import org.slf4j.Logger;
@@ -19,11 +20,16 @@ import java.util.Objects;
  * one immutable transmission out.
  *
  * <p>Order of gates per plan §5.2: expiry first (an expired emission is never
- * sent, outcome {@code EXPIRED}), then technique resolution and PDU build
- * (outcome {@code FAILED} when the catalog entry or the number is unusable),
- * then the modem send via {@link PduSender} ({@code ACCEPTED} or
- * {@code FAILED} with the AT error as cause). Policy and dedupe run upstream
- * of this handler in the chain.
+ * sent, outcome {@code EXPIRED}), then cancellation (the agent drops work the
+ * platform cancelled while it was queued, outcome {@code CANCELLED}), then
+ * technique resolution and PDU build (outcome {@code FAILED} when the technique
+ * is not implemented or the number is unusable), then the modem send via
+ * {@link PduSender} ({@code ACCEPTED} or {@code FAILED} with the AT error as
+ * cause). Policy and dedupe run upstream of this handler in the chain.
+ *
+ * <p>Payloads discarded by the protocol gate are reported too: a command the
+ * freshness gate refused becomes an {@code EXPIRED} transmission, so the
+ * platform learns why nothing was sent instead of waiting for a retry timeout.
  */
 public final class EmissionExecutor implements EmissionHandler {
 
@@ -48,42 +54,70 @@ public final class EmissionExecutor implements EmissionHandler {
         Instant requestedAt = Instant.now(clock);
         if (command.expiresAt() == null || !requestedAt.isBefore(command.expiresAt())) {
             LOG.info("emission {} expired before send - reporting EXPIRED", command.emissionId());
-            transmissions.report(command, TransmissionResult.Outcome.EXPIRED, null, null, requestedAt);
+            report(command, TransmissionResult.Outcome.EXPIRED, null, null, requestedAt, false);
             return;
         }
 
         Technique technique;
         try {
-            technique = Technique.valueOf(command.technique());
+            technique = Technique.fromWireCode(command.technique());
         } catch (IllegalArgumentException e) {
-            transmissions.report(command, TransmissionResult.Outcome.FAILED,
-                    "unknown technique " + command.technique(), null, requestedAt);
+            report(command, TransmissionResult.Outcome.FAILED, e.getMessage(), null, requestedAt, false);
             return;
         }
 
         String pdu;
         try {
-            pdu = technique.generate(digitsOf(command.msisdn()), defaultParams(technique));
+            pdu = technique.generate(digitsOf(command.msisdn()), TechniqueParams.None.INSTANCE);
         } catch (IllegalArgumentException e) {
-            transmissions.report(command, TransmissionResult.Outcome.FAILED,
-                    "cannot build PDU: " + e.getMessage(), null, requestedAt);
+            report(command, TransmissionResult.Outcome.FAILED, "cannot build PDU: " + e.getMessage(),
+                    null, requestedAt, false);
             return;
         }
 
         try {
             sender.send(pdu);
-            transmissions.report(command, TransmissionResult.Outcome.ACCEPTED, null, pdu, requestedAt);
         } catch (Exception e) {
             LOG.warn("send failed for emission {}: {}", command.emissionId(), e.getMessage());
-            transmissions.report(command, TransmissionResult.Outcome.FAILED,
+            report(command, TransmissionResult.Outcome.FAILED,
                     e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(),
-                    pdu, requestedAt);
+                    pdu, requestedAt, false);
+            return;
         }
+        report(command, TransmissionResult.Outcome.ACCEPTED, null, pdu, requestedAt, true);
     }
 
     @Override
     public void onRejected(String rawPayload, EmissionConsumer.RejectReason reason) {
-        LOG.debug("emission payload discarded before execution ({})", reason);
+        if (reason == EmissionConsumer.RejectReason.INVALID) {
+            // No trustworthy identity in the payload — there is nothing to record.
+            LOG.debug("emission payload discarded before execution ({})", reason);
+            return;
+        }
+        try {
+            EmissionCommand command = ProtocolJson.read(rawPayload, EmissionCommand.class);
+            LOG.info("emission {} refused by the freshness gate ({}) - reporting EXPIRED",
+                    command.emissionId(), reason);
+            report(command, TransmissionResult.Outcome.EXPIRED,
+                    "refused by the freshness gate: " + reason, null, Instant.now(clock), false);
+        } catch (RuntimeException e) {
+            LOG.warn("cannot report a {} emission refusal: {}", reason, e.getMessage());
+        }
+    }
+
+    /**
+     * Reports an outcome, turning a reporting failure into
+     * {@link EmissionExecutionException} so the consumer neither commits nor
+     * (when the modem was already touched) allows a duplicate send.
+     */
+    private void report(EmissionCommand command, String outcome, String failureCause,
+                        String pduHex, Instant requestedAt, boolean sent) {
+        try {
+            transmissions.report(command, outcome, failureCause, pduHex, requestedAt);
+        } catch (RuntimeException e) {
+            throw new EmissionExecutionException(sent,
+                    "cannot report " + outcome + " for emission " + command.emissionId(), e);
+        }
     }
 
     /** E.164 destination without the leading '+' (the technique generators want bare digits). */
@@ -93,10 +127,5 @@ public final class EmissionExecutor implements EmissionHandler {
             digits = digits.substring(1);
         }
         return digits;
-    }
-
-    /** v1 commands carry no parameters — every catalogued technique is parameterless. */
-    static TechniqueParams defaultParams(Technique technique) {
-        return TechniqueParams.None.INSTANCE;
     }
 }

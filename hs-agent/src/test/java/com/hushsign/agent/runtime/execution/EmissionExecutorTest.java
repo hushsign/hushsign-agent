@@ -1,6 +1,7 @@
 package com.hushsign.agent.runtime.execution;
 
 import com.hushsign.agent.runtime.heartbeat.Hashes;
+import com.hushsign.agent.runtime.kafka.EmissionConsumer;
 import com.hushsign.agent.runtime.spool.Spool;
 import com.hushsign.agent.runtime.transmission.TransmissionProducer;
 import com.hushsign.protocol.ProtocolJson;
@@ -123,6 +124,36 @@ class EmissionExecutorTest {
         assertEquals("FAILED", result.outcome());
         assertEquals("unknown technique LASER_PING", result.failureCause());
         assertNull(sentPdu.get());
+    }
+
+    @Test
+    void reservedTechniqueIsRefusedWithItsOwnReason() {
+        // In the append-only contract but withdrawn after the P1-S14 field sweep.
+        executor.onCommand(command("5c9f7a2e-66f1-4b1f-9e7f-1f2a3b4c5d6e", NOW.plusSeconds(600), "WAP_PUSH_SL"));
+
+        TransmissionResult result = lastResult();
+        assertEquals("FAILED", result.outcome());
+        assertEquals("technique WAP_PUSH_SL is not implemented by this build (reserved in the catalog)",
+                result.failureCause());
+        assertNull(sentPdu.get());
+    }
+
+    @Test
+    void aCommandRefusedByTheFreshnessGateIsReportedAsExpired() {
+        executor.onRejected(ProtocolJson.write(freshCommand("5c9f7a2e-66f1-4b1f-9e7f-1f2a3b4c5d6e")),
+                EmissionConsumer.RejectReason.STALE);
+
+        TransmissionResult result = lastResult();
+        assertEquals("EXPIRED", result.outcome());
+        assertEquals("refused by the freshness gate: STALE", result.failureCause());
+        assertNull(sentPdu.get(), "a stale command must never reach the modem");
+    }
+
+    @Test
+    void anInvalidPayloadIsNotReported() {
+        executor.onRejected("{not-json", EmissionConsumer.RejectReason.INVALID);
+
+        assertEquals(0, spool.size(), "an unidentifiable payload has nothing to report");
     }
 
     @Test
