@@ -11,6 +11,12 @@ import java.util.Map;
  * Topic: {@code hs.fleet.heartbeat.v1}, keyed by gatewayId.
  *
  * <p>Data minimization: IMSI/ICCID only as hashes, MSISDN only masked.
+ *
+ * <p>{@code sequence} restarts at 0 with every process, so it is only monotonic
+ * within one run; {@code bootId} identifies the run and makes a sequence gap
+ * attributable to a restart instead of a lost heartbeat. {@code supportedTechniques}
+ * is the catalog this build can actually send (the platform must not schedule a
+ * technique the gateway would refuse).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GatewayHeartbeat(
@@ -24,7 +30,9 @@ public record GatewayHeartbeat(
         Instant sentAt,
         List<ModemInfo> modems,
         List<SimInfo> sims,
-        Map<String, Long> counters) {
+        Map<String, Long> counters,
+        String bootId,
+        List<String> supportedTechniques) {
 
     /** One modem attached to the gateway. */
     @JsonIgnoreProperties(ignoreUnknown = true)

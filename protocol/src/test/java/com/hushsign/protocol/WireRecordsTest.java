@@ -72,6 +72,8 @@ class WireRecordsTest {
         assertEquals(1, heartbeat.sims().size());
         assertEquals("+40722••••22", heartbeat.sims().get(0).msisdnMasked());
         assertEquals(2L, heartbeat.counters().get("transmissionsAccepted"));
+        assertNotNull(heartbeat.bootId());
+        assertEquals(4, heartbeat.supportedTechniques().size());
         VALIDATOR.validate(MessageType.GATEWAY_HEARTBEAT, ProtocolJson.write(heartbeat));
     }
 

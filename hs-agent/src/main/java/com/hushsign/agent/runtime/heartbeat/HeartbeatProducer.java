@@ -1,5 +1,6 @@
 package com.hushsign.agent.runtime.heartbeat;
 
+import com.hushsign.agent.technique.Technique;
 import com.hushsign.agent.runtime.spool.Spool;
 import com.hushsign.protocol.MessageType;
 import com.hushsign.protocol.ProtocolJson;
@@ -9,7 +10,9 @@ import com.hushsign.protocol.v1.GatewayHeartbeat;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * P1-S9: builds the gateway heartbeat and spools it to
@@ -28,6 +31,8 @@ public final class HeartbeatProducer {
     private final Spool spool;
     private final Clock clock;
     private final ProtocolValidator validator = new ProtocolValidator();
+    private final String bootId = UUID.randomUUID().toString();
+    private final List<String> supportedTechniques = Technique.supportedWireCodes();
 
     private long sequence;
 
@@ -56,6 +61,11 @@ public final class HeartbeatProducer {
 
     public synchronized long sequence() {
         return sequence;
+    }
+
+    /** Identity of this process run — makes a sequence restart attributable. */
+    public String bootId() {
+        return bootId;
     }
 
     private GatewayHeartbeat build() {
@@ -88,6 +98,8 @@ public final class HeartbeatProducer {
                 Instant.now(clock),
                 source.modems(),
                 source.sims(),
-                source.counters());
+                source.counters(),
+                bootId,
+                supportedTechniques);
     }
 }
