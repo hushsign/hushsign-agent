@@ -18,6 +18,13 @@ public final class Topics {
     /** Consumer group prefix used by gateways of one operator: {@code gw-226-10}. */
     public static final String GATEWAY_GROUP_PREFIX = "gw-";
 
+    /**
+     * Consumer group prefix of the per-gateway cancellation consumer:
+     * {@code gw-cancel-gw-buc-01}. Cancellations are broadcast — every gateway
+     * needs every cancellation, so the group must be unique per gateway.
+     */
+    public static final String GATEWAY_CANCEL_GROUP_PREFIX = "gw-cancel-";
+
     /** Consumer group prefix used by platform modules: {@code cg-operations}. */
     public static final String MODULE_GROUP_PREFIX = "cg-";
 
@@ -40,5 +47,13 @@ public final class Topics {
             throw new IllegalArgumentException("operator must be MCC-MNC like 226-10, got: " + operator);
         }
         return GATEWAY_GROUP_PREFIX + operator;
+    }
+
+    /** {@code gw-cancel-gw-buc-01}: the per-gateway (broadcast) cancellation group. */
+    public static String cancelGroup(String gatewayId) {
+        if (gatewayId == null || gatewayId.isBlank() || gatewayId.length() > 128) {
+            throw new IllegalArgumentException("gatewayId must be 1-128 chars, got: " + gatewayId);
+        }
+        return GATEWAY_CANCEL_GROUP_PREFIX + gatewayId;
     }
 }
