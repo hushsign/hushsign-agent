@@ -42,6 +42,7 @@ class AgentConfigLoaderTest {
         assertEquals("PLAINTEXT", config.kafka().security().protocol());
         assertTrue(config.modems().autoScan());
         assertEquals(115_200, config.modems().baudRate());
+        assertEquals("FULL_HEX", config.modems().pduSubmission());
         assertEquals(30, config.heartbeat().intervalSeconds());
         assertEquals(10_000, config.dedupe().maxEntries());
         assertEquals("spool", config.spool().path());
@@ -192,5 +193,36 @@ class AgentConfigLoaderTest {
         AgentConfig config = AgentConfigLoader.load(ok, Map.of());
         assertFalse(config.modems().autoScan());
         assertEquals(List.of("/dev/ttyUSB0"), config.modems().ports());
+    }
+
+    @Test
+    void pduSubmissionIsSelectableAndValidated() throws Exception {
+        Path file = write("""
+                gatewayId: gw-1
+                operators: ["226-10"]
+                modems:
+                  autoScan: false
+                  ports: ["COM6"]
+                  pduSubmission: tpdu_hex
+                """);
+
+        AgentConfig config = AgentConfigLoader.load(file, Map.of());
+        assertEquals("TPDU_HEX", config.modems().pduSubmission(),
+                "the Huawei K3765 family needs the TPDU form (P1-S14)");
+
+        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(null, Map.of(
+                "HS_GATEWAY_ID", "gw-1", "HS_OPERATORS", "226-10",
+                "HS_MODEMS_AUTO_SCAN", "false", "HS_MODEMS_PORTS", "COM6",
+                "HS_MODEMS_PDU_SUBMISSION", "binary")));
+    }
+
+    @Test
+    void simPinComesFromTheEnvironment() {
+        AgentConfig config = AgentConfigLoader.load(null, Map.of(
+                "HS_GATEWAY_ID", "gw-1",
+                "HS_OPERATORS", "226-10",
+                "HS_MODEMS_SIM_PIN", "1234"));
+
+        assertEquals("1234", config.modems().simPin());
     }
 }

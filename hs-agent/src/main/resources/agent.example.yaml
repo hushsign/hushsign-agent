@@ -26,6 +26,10 @@ modems:
   pollWaitMs: 200
   probeAttempts: 3
   maxConsecutiveErrors: 3
+  # "FULL_HEX" is the standard AT+CMGS form. Huawei K3765-family firmware
+  # rejects it with +CMS ERROR: 304 and needs "TPDU_HEX" (P1-S14).
+  pduSubmission: FULL_HEX
+  # simPin: set HS_MODEMS_SIM_PIN — never commit a PIN to this file
 
 heartbeat:
   intervalSeconds: 30

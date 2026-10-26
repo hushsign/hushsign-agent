@@ -44,7 +44,12 @@ public record AgentConfig(
             int commandWaitMs,
             int pollWaitMs,
             int probeAttempts,
-            int maxConsecutiveErrors) {
+            int maxConsecutiveErrors,
+            String simPin,
+            String pduSubmission) {
+
+        /** Accepted values of {@link #pduSubmission} — mirrors {@code PduSubmission}. */
+        public static final List<String> PDU_SUBMISSIONS = List.of("FULL_HEX", "TPDU_HEX");
     }
 
     public record HeartbeatConfig(int intervalSeconds) {

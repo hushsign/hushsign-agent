@@ -44,7 +44,8 @@ public final class AgentConfigLoader {
     private static final Set<String> SECURITY_KEYS = Set.of("protocol", "saslMechanism",
             "saslUsername", "saslPassword", "truststorePath");
     private static final Set<String> MODEMS_KEYS = Set.of("autoScan", "ports", "baudRate",
-            "responseTimeoutMs", "commandWaitMs", "pollWaitMs", "probeAttempts", "maxConsecutiveErrors");
+            "responseTimeoutMs", "commandWaitMs", "pollWaitMs", "probeAttempts",
+            "maxConsecutiveErrors", "simPin", "pduSubmission");
     private static final Set<String> HEARTBEAT_KEYS = Set.of("intervalSeconds");
     private static final Set<String> DEDUPE_KEYS = Set.of("maxEntries");
     private static final Set<String> SPOOL_KEYS = Set.of("path");
@@ -133,7 +134,9 @@ public final class AgentConfigLoader {
                 nonNegative(intVal(modems, "modems.", "commandWaitMs", env, 700), "modems.commandWaitMs"),
                 positive(intVal(modems, "modems.", "pollWaitMs", env, 200), "modems.pollWaitMs"),
                 positive(intVal(modems, "modems.", "probeAttempts", env, 3), "modems.probeAttempts"),
-                positive(intVal(modems, "modems.", "maxConsecutiveErrors", env, 3), "modems.maxConsecutiveErrors"));
+                positive(intVal(modems, "modems.", "maxConsecutiveErrors", env, 3), "modems.maxConsecutiveErrors"),
+                str(modems, "modems.", "simPin", env, null),
+                pduSubmission(modems, env));
 
         Map<String, Object> heartbeat = section(root, "heartbeat");
         checkKeys(heartbeat, HEARTBEAT_KEYS, "heartbeat.");
@@ -245,6 +248,21 @@ public final class AgentConfigLoader {
             return false;
         }
         throw new ConfigException(path + key + " must be true or false, got " + value);
+    }
+
+    /**
+     * {@code modems.pduSubmission} (P1-S14): {@code FULL_HEX} (standard) or
+     * {@code TPDU_HEX} (Huawei K3765 family, which rejects the full form with
+     * {@code +CMS ERROR: 304}). Defaults to the standard form.
+     */
+    private static String pduSubmission(Map<String, Object> modems, Map<String, String> env) {
+        String value = str(modems, "modems.", "pduSubmission", env, "FULL_HEX");
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (!ModemsConfig.PDU_SUBMISSIONS.contains(normalized)) {
+            throw new ConfigException("modems.pduSubmission must be one of "
+                    + ModemsConfig.PDU_SUBMISSIONS + ", got " + value);
+        }
+        return normalized;
     }
 
     private static List<String> strList(Map<String, Object> map, String path, String key,
