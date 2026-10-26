@@ -1,14 +1,12 @@
 package com.hushsign.agent.runtime.kafka;
 
+import com.hushsign.agent.config.AgentConfig;
 import com.hushsign.agent.runtime.spool.SpoolSender;
 import com.hushsign.agent.runtime.spool.SpooledRecord;
 import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.serialization.StringSerializer;
 
 import java.time.Duration;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -25,7 +23,14 @@ public final class KafkaSpoolSender implements SpoolSender, AutoCloseable {
     private final Duration sendTimeout;
 
     public KafkaSpoolSender(String bootstrapServers) {
-        this(new KafkaProducer<>(producerConfig(bootstrapServers)), DEFAULT_SEND_TIMEOUT);
+        this(new KafkaProducer<>(KafkaClientSettings.producer(new AgentConfig.KafkaConfig(
+                        bootstrapServers, null,
+                        new AgentConfig.SecurityConfig("PLAINTEXT", null, null, null, null, null)))),
+                DEFAULT_SEND_TIMEOUT);
+    }
+
+    public KafkaSpoolSender(AgentConfig.KafkaConfig kafka) {
+        this(new KafkaProducer<>(KafkaClientSettings.producer(kafka)), DEFAULT_SEND_TIMEOUT);
     }
 
     public KafkaSpoolSender(KafkaProducer<String, String> producer, Duration sendTimeout) {
@@ -42,14 +47,5 @@ public final class KafkaSpoolSender implements SpoolSender, AutoCloseable {
     @Override
     public void close() {
         producer.close();
-    }
-
-    private static Properties producerConfig(String bootstrapServers) {
-        Properties props = new Properties();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        props.put(ProducerConfig.ACKS_CONFIG, "all");
-        return props;
     }
 }

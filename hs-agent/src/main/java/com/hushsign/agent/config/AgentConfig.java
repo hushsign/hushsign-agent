@@ -33,7 +33,8 @@ public record AgentConfig(
             String saslMechanism,
             String saslUsername,
             String saslPassword,
-            String truststorePath) {
+            String truststorePath,
+            String truststorePassword) {
     }
 
     public record ModemsConfig(

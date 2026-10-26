@@ -1,5 +1,6 @@
 package com.hushsign.agent.runtime.kafka;
 
+import com.hushsign.agent.config.AgentConfig;
 import com.hushsign.protocol.CommandValidator;
 import com.hushsign.protocol.ProtocolJson;
 import com.hushsign.protocol.Topics;
@@ -105,7 +106,7 @@ class EmissionConsumerTest {
 
     @Test
     void subscriberPropertiesAreManualCommitAndStartAtLatest() {
-        Properties props = EmissionConsumer.consumerProperties("kafka:9092", OPERATOR);
+        Properties props = EmissionConsumer.consumerProperties(plaintext("kafka:9092"), OPERATOR);
 
         assertEquals("gw-" + OPERATOR, props.get(ConsumerConfig.GROUP_ID_CONFIG));
         assertEquals("false", props.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG));
@@ -200,4 +201,9 @@ class EmissionConsumerTest {
             return e.getMessage() != null && e.getMessage().contains("closed");
         }
     }
-}
+
+    /** A PLAINTEXT Kafka config for property assertions (no broker needed). */
+    private static AgentConfig.KafkaConfig plaintext(String bootstrap) {
+        return new AgentConfig.KafkaConfig(bootstrap, null,
+                new AgentConfig.SecurityConfig("PLAINTEXT", null, null, null, null, null));
+    }}

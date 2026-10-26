@@ -42,7 +42,7 @@ public final class AgentConfigLoader {
             "kafka", "modems", "heartbeat", "dedupe", "spool", "policy");
     private static final Set<String> KAFKA_KEYS = Set.of("bootstrapServers", "clientId", "security");
     private static final Set<String> SECURITY_KEYS = Set.of("protocol", "saslMechanism",
-            "saslUsername", "saslPassword", "truststorePath");
+            "saslUsername", "saslPassword", "truststorePath", "truststorePassword");
     private static final Set<String> MODEMS_KEYS = Set.of("autoScan", "ports", "baudRate",
             "responseTimeoutMs", "commandWaitMs", "pollWaitMs", "probeAttempts",
             "maxConsecutiveErrors", "simPin", "pduSubmission");
@@ -117,7 +117,8 @@ public final class AgentConfigLoader {
                         str(security, "kafka.security.", "saslMechanism", env, null),
                         str(security, "kafka.security.", "saslUsername", env, null),
                         str(security, "kafka.security.", "saslPassword", env, null),
-                        str(security, "kafka.security.", "truststorePath", env, null)));
+                        str(security, "kafka.security.", "truststorePath", env, null),
+                        str(security, "kafka.security.", "truststorePassword", env, null)));
 
         Map<String, Object> modems = section(root, "modems");
         checkKeys(modems, MODEMS_KEYS, "modems.");

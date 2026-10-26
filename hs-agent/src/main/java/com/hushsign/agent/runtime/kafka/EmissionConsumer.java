@@ -1,5 +1,6 @@
 package com.hushsign.agent.runtime.kafka;
 
+import com.hushsign.agent.config.AgentConfig;
 import com.hushsign.protocol.CommandValidator;
 import com.hushsign.protocol.MessageType;
 import com.hushsign.protocol.ProtocolJson;
@@ -10,7 +11,6 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +70,13 @@ public final class EmissionConsumer implements AutoCloseable {
     private Thread pollThread;
 
     public EmissionConsumer(String bootstrapServers, String operator, EmissionHandler handler) {
-        this(buildConsumer(bootstrapServers, operator), operator, handler,
+        this(new AgentConfig.KafkaConfig(bootstrapServers, null,
+                        new AgentConfig.SecurityConfig("PLAINTEXT", null, null, null, null, null)),
+                operator, handler);
+    }
+
+    public EmissionConsumer(AgentConfig.KafkaConfig kafka, String operator, EmissionHandler handler) {
+        this(new KafkaConsumer<>(consumerProperties(kafka, operator)), operator, handler,
                 new CommandValidator(), Clock.systemUTC());
     }
 
@@ -84,26 +90,18 @@ public final class EmissionConsumer implements AutoCloseable {
         this.consumer.subscribe(List.of(Topics.emissions(operator)));
     }
 
-    private static KafkaConsumer<String, String> buildConsumer(String bootstrapServers, String operator) {
-        return new KafkaConsumer<>(consumerProperties(bootstrapServers, operator));
-    }
-
     /**
      * Properties of the emission consumer — package-visible so tests can assert
-     * the group, the manual commit and the offset policy without a broker.
+     * the group, the manual commit, the offset policy and the TLS/SASL block
+     * without a broker.
      */
-    static Properties consumerProperties(String bootstrapServers, String operator) {
-        Properties props = new Properties();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, Topics.gatewayGroup(operator));
+    static Properties consumerProperties(AgentConfig.KafkaConfig kafka, String operator) {
+        Properties props = KafkaClientSettings.consumer(kafka, Topics.gatewayGroup(operator),
+                // A freshly enrolled gateway must not replay the whole 7-day emission
+                // topic: every replayed command would be refused by the freshness gate
+                // anyway, in one burst. New work arrives with the subscription.
+                "latest", 10);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-        // A freshly enrolled gateway must not replay the whole 7-day emission topic:
-        // every replayed command would be refused by the freshness gate anyway, in
-        // one burst. New work arrives with the subscription.
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
-        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "10");
         return props;
     }
 

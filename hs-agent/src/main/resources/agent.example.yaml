@@ -11,11 +11,12 @@ kafka:
   bootstrapServers: localhost:9092
   clientId: gw-buc-01
   security:
-    protocol: PLAINTEXT        # PLAINTEXT | SASL_SSL
+    protocol: PLAINTEXT        # PLAINTEXT | SSL | SASL_PLAINTEXT | SASL_SSL
     saslMechanism: SCRAM-SHA-512
     saslUsername: gw-226-10
     # saslPassword: set HS_KAFKA_SECURITY_SASL_PASSWORD
     truststorePath: ""
+    # truststorePassword: set HS_KAFKA_SECURITY_TRUSTSTORE_PASSWORD (only for SSL/SASL_SSL)
 
 modems:
   autoScan: true

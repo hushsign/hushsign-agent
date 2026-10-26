@@ -1,5 +1,7 @@
 package com.hushsign.agent.runtime.cancel;
 
+import com.hushsign.agent.config.AgentConfig;
+import com.hushsign.agent.runtime.kafka.KafkaClientSettings;
 import com.hushsign.protocol.CommandValidator;
 import com.hushsign.protocol.MessageType;
 import com.hushsign.protocol.ProtocolJson;
@@ -10,7 +12,6 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +56,14 @@ public final class CancellationConsumer implements AutoCloseable {
 
     public CancellationConsumer(String bootstrapServers, String gatewayId,
                                 CancellationStore cancellations) {
-        this(buildConsumer(bootstrapServers, gatewayId), gatewayId, cancellations,
+        this(new AgentConfig.KafkaConfig(bootstrapServers, null,
+                        new AgentConfig.SecurityConfig("PLAINTEXT", null, null, null, null, null)),
+                gatewayId, cancellations);
+    }
+
+    public CancellationConsumer(AgentConfig.KafkaConfig kafka, String gatewayId,
+                                CancellationStore cancellations) {
+        this(new KafkaConsumer<>(consumerProperties(kafka, gatewayId)), gatewayId, cancellations,
                 new CommandValidator(), Clock.systemUTC());
     }
 
@@ -72,24 +80,20 @@ public final class CancellationConsumer implements AutoCloseable {
 
     /**
      * Properties of the cancellation consumer. Package-visible so tests can
-     * assert the per-gateway group and the offset policy without a broker.
+     * assert the per-gateway group, the offset policy and the TLS/SASL block
+     * without a broker.
      */
-    static Properties consumerProperties(String bootstrapServers, String gatewayId) {
-        Properties props = new Properties();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, Topics.cancelGroup(gatewayId));
+    static Properties consumerProperties(AgentConfig.KafkaConfig kafka, String gatewayId) {
+        Properties props = KafkaClientSettings.consumer(kafka, Topics.cancelGroup(gatewayId),
+                // Older cancellations are useless (the emissions they target are stale
+                // too): a fresh gateway must not replay the whole retention window.
+                "latest", 50);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-        // Older cancellations are useless (the emissions they target are stale too):
-        // a fresh gateway must not replay the whole retention window on first start.
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
-        props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "50");
         return props;
     }
 
-    private static KafkaConsumer<String, String> buildConsumer(String bootstrapServers, String gatewayId) {
-        return new KafkaConsumer<>(consumerProperties(bootstrapServers, gatewayId));
+    private static KafkaConsumer<String, String> buildConsumer(AgentConfig.KafkaConfig kafka, String gatewayId) {
+        return new KafkaConsumer<>(consumerProperties(kafka, gatewayId));
     }
 
     /** The consumer group of this gateway. */

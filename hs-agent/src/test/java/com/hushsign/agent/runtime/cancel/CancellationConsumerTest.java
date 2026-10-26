@@ -1,5 +1,6 @@
 package com.hushsign.agent.runtime.cancel;
 
+import com.hushsign.agent.config.AgentConfig;
 import com.hushsign.protocol.CommandValidator;
 import com.hushsign.protocol.ProtocolJson;
 import com.hushsign.protocol.Topics;
@@ -74,7 +75,7 @@ class CancellationConsumerTest {
 
     @Test
     void consumerPropertiesUseTheGatewayGroupAndSkipOldRecords() {
-        Properties props = CancellationConsumer.consumerProperties("kafka:9092", GATEWAY);
+        Properties props = CancellationConsumer.consumerProperties(plaintext("kafka:9092"), GATEWAY);
 
         assertEquals("gw-cancel-" + GATEWAY, props.get(ConsumerConfig.GROUP_ID_CONFIG));
         assertEquals("false", props.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG));
@@ -109,4 +110,9 @@ class CancellationConsumerTest {
         assertEquals(0, store.size());
         assertEquals(1, consumer.refusedCount());
     }
-}
+
+    /** A PLAINTEXT Kafka config for property assertions (no broker needed). */
+    private static AgentConfig.KafkaConfig plaintext(String bootstrap) {
+        return new AgentConfig.KafkaConfig(bootstrap, null,
+                new AgentConfig.SecurityConfig("PLAINTEXT", null, null, null, null, null));
+    }}

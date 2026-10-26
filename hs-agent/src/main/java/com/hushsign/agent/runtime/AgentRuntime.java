@@ -110,8 +110,7 @@ public final class AgentRuntime implements AutoCloseable {
         CancellationStore cancels = CancellationStore.open(
                 workDir.resolve("cancellations.ids"), config.dedupe().maxEntries());
 
-        String bootstrap = config.kafka().bootstrapServers();
-        KafkaSpoolSender sender = new KafkaSpoolSender(bootstrap);
+        KafkaSpoolSender sender = new KafkaSpoolSender(config.kafka());
         TransmissionProducer transmissions = new TransmissionProducer(
                 config.gatewayId(), serialOf(modem), null, spool);
 
@@ -124,10 +123,10 @@ public final class AgentRuntime implements AutoCloseable {
 
         List<EmissionConsumer> consumers = new ArrayList<>();
         for (String operator : config.operators()) {
-            consumers.add(new EmissionConsumer(bootstrap, operator, chain));
+            consumers.add(new EmissionConsumer(config.kafka(), operator, chain));
         }
         CancellationConsumer cancellationConsumer =
-                new CancellationConsumer(bootstrap, config.gatewayId(), cancels);
+                new CancellationConsumer(config.kafka(), config.gatewayId(), cancels);
 
         HeartbeatSource source = new RuntimeHeartbeatSource(config, configFile, modem, consumers,
                 Instant.now(), agentVersion);
