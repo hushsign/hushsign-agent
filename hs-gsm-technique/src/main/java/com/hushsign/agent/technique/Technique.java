@@ -1,10 +1,11 @@
 package com.hushsign.agent.technique;
 
 import java.util.HexFormat;
+import java.util.List;
 
 /**
- * The technique catalog: six silent-SMS ping variants, each a fixed template
- * whose user data was captured from HushSMS and cross-checked with PduSpy.
+ * The technique catalog: the four shipped silent-SMS ping variants, each a fixed
+ * template whose user data was captured from HushSMS and cross-checked with PduSpy.
  *
  * <p>{@link #generate} assembles a complete SMS-SUBMIT PDU hex string for a
  * destination MSISDN: zero-length SMSC octet ({@code 00}), first octet,
@@ -14,6 +15,12 @@ import java.util.HexFormat;
  *
  * <p>Per HushSign invariant 8, the only content a ping carries is the
  * technique's fixed template — destinations are the only variable input.
+ *
+ * <p>Wire codes are the enum names ({@link #fromWireCode}); {@link #code()} is the
+ * stable lowercase catalog id the platform persists. Not every code in the
+ * append-only protocol enum has a generator: {@link #RESERVED_WIRE_CODES} are
+ * reserved (withdrawn after the P1-S14 field sweep) and are refused explicitly
+ * instead of masquerading as an unknown technique.
  */
 public enum Technique {
 
@@ -32,6 +39,13 @@ public enum Technique {
      */
     MWI_DEACTIVATE("mwi_deactivate", "MWI deactivation (voicemail icon clear)", 0x61, 0x00, 0x00,
             "040102000000");
+
+    /**
+     * Codes the protocol enum carries but this build does not generate: they stay
+     * in the wire contract (append-only) and are refused with an explicit reason.
+     */
+    public static final List<String> RESERVED_WIRE_CODES =
+            List.of("WAP_PUSH_SL", "WAP_PUSH_SI", "MWI_TOGGLE");
 
     private static final HexFormat HEX = HexFormat.of().withUpperCase();
 
@@ -53,6 +67,41 @@ public enum Technique {
 
     public String code() {
         return code;
+    }
+
+    /**
+     * The wire code this build advertises for the technique (the enum name, e.g.
+     * {@code SILENT_TP0}) — the same value the platform puts in
+     * {@code EmissionCommand.technique}.
+     */
+    public String wireCode() {
+        return name();
+    }
+
+    /** Wire codes of every technique this build can actually send, in catalog order. */
+    public static List<String> supportedWireCodes() {
+        return List.of(values()).stream().map(Technique::wireCode).toList();
+    }
+
+    /**
+     * Resolves a wire code carried by a command.
+     *
+     * @throws IllegalArgumentException when the code is unknown to the protocol, or
+     *         known but reserved in this build ({@link #RESERVED_WIRE_CODES}) — the
+     *         caller turns this into a {@code FAILED} transmission with the exact reason
+     */
+    public static Technique fromWireCode(String wireCode) {
+        String code = wireCode == null ? "" : wireCode.trim();
+        if (RESERVED_WIRE_CODES.contains(code)) {
+            throw new IllegalArgumentException(
+                    "technique " + code + " is not implemented by this build (reserved in the catalog)");
+        }
+        for (Technique technique : values()) {
+            if (technique.name().equals(code)) {
+                return technique;
+            }
+        }
+        throw new IllegalArgumentException("unknown technique " + code);
     }
 
     public String description() {
