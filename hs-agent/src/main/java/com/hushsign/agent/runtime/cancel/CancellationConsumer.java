@@ -9,8 +9,10 @@ import com.hushsign.protocol.Topics;
 import com.hushsign.protocol.v1.EmissionCancelled;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +49,7 @@ public final class CancellationConsumer implements AutoCloseable {
     private final CancellationStore cancellations;
     private final CommandValidator validator;
     private final Clock clock;
+    private final long retryDelayMs;
 
     private final AtomicLong applied = new AtomicLong();
     private final AtomicLong refused = new AtomicLong();
@@ -70,11 +73,18 @@ public final class CancellationConsumer implements AutoCloseable {
     public CancellationConsumer(Consumer<String, String> consumer, String gatewayId,
                                 CancellationStore cancellations,
                                 CommandValidator validator, Clock clock) {
+        this(consumer, gatewayId, cancellations, validator, clock, 1_000L);
+    }
+
+    CancellationConsumer(Consumer<String, String> consumer, String gatewayId,
+                         CancellationStore cancellations,
+                         CommandValidator validator, Clock clock, long retryDelayMs) {
         this.consumer = consumer;
         this.groupId = Topics.cancelGroup(gatewayId);
         this.cancellations = cancellations;
         this.validator = validator;
         this.clock = clock;
+        this.retryDelayMs = retryDelayMs;
         this.consumer.subscribe(List.of(Topics.EMISSIONS_CANCELLED));
     }
 
@@ -134,8 +144,9 @@ public final class CancellationConsumer implements AutoCloseable {
 
     /**
      * Polls once, records every valid cancellation, then commits. An invalid or
-     * stale record is terminal (logged and committed); a store failure aborts
-     * the batch so the cancellation is redelivered.
+     * stale record is terminal (logged and committed); a store failure rewinds
+     * the partition to the failed record and aborts the batch, so the next poll
+     * retries it instead of silently skipping the cancellation.
      */
     public int pollOnce(Duration timeout) {
         ConsumerRecords<String, String> records = consumer.poll(timeout);
@@ -155,16 +166,35 @@ public final class CancellationConsumer implements AutoCloseable {
                 cancellations.cancel(cancelled.emissionId());
                 applied.incrementAndGet();
             } catch (RuntimeException e) {
-                LOG.error("cannot record cancellation for {}; leaving the batch uncommitted",
-                        cancelled.emissionId(), e);
+                rewindTo(record);
+                LOG.error("cannot record cancellation for {} at offset {}; batch uncommitted and rewound",
+                        cancelled.emissionId(), record.offset(), e);
                 batchHandled = false;
                 break;
             }
         }
         if (batchHandled && records.count() > 0) {
             consumer.commitSync(Duration.ofSeconds(5));
+        } else if (!batchHandled) {
+            sleepQuietly(retryDelayMs);
         }
         return records.count();
+    }
+
+    private void rewindTo(ConsumerRecord<String, String> record) {
+        try {
+            consumer.seek(new TopicPartition(record.topic(), record.partition()), record.offset());
+        } catch (RuntimeException e) {
+            LOG.warn("cannot rewind cancellation offset {}: {}", record.offset(), e.getMessage());
+        }
+    }
+
+    private static void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Override

@@ -8,8 +8,10 @@ import com.hushsign.protocol.Topics;
 import com.hushsign.protocol.v1.EmissionCommand;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +63,7 @@ public final class EmissionConsumer implements AutoCloseable {
     private final EmissionHandler handler;
     private final CommandValidator validator;
     private final Clock clock;
+    private final long retryDelayMs;
 
     private final AtomicLong delivered = new AtomicLong();
     private final AtomicLong rejected = new AtomicLong();
@@ -82,11 +85,18 @@ public final class EmissionConsumer implements AutoCloseable {
 
     public EmissionConsumer(Consumer<String, String> consumer, String operator,
                             EmissionHandler handler, CommandValidator validator, Clock clock) {
+        this(consumer, operator, handler, validator, clock, 1_000L);
+    }
+
+    EmissionConsumer(Consumer<String, String> consumer, String operator,
+                     EmissionHandler handler, CommandValidator validator, Clock clock,
+                     long retryDelayMs) {
         this.consumer = consumer;
         this.operator = operator;
         this.handler = handler;
         this.validator = validator;
         this.clock = clock;
+        this.retryDelayMs = retryDelayMs;
         this.consumer.subscribe(List.of(Topics.emissions(operator)));
     }
 
@@ -165,7 +175,9 @@ public final class EmissionConsumer implements AutoCloseable {
     /**
      * Polls once, validates and dispatches every record, then commits the
      * batch when fully handled. Rejected records are terminal and committed;
-     * a handler failure aborts the batch without committing (redelivery).
+     * a handler failure <b>rewinds the partition to the failed record</b> and
+     * aborts the batch without committing, so the next poll retries it
+     * in-process (at-least-once; the dedupe store absorbs the retry).
      */
     public int pollOnce(Duration timeout) {
         applyPauseState();
@@ -198,15 +210,39 @@ public final class EmissionConsumer implements AutoCloseable {
                 handler.onCommand(ProtocolJson.read(raw, EmissionCommand.class));
                 delivered.incrementAndGet();
             } catch (Exception e) {
-                LOG.error("handler failed on {}; batch left uncommitted", topic(), e);
+                // Without the rewind the position would already be past this
+                // record, so "uncommitted" alone means "lost until restart".
+                rewindTo(record);
+                LOG.error("handler failed on {} at offset {}; batch uncommitted and rewound",
+                        topic(), record.offset(), e);
                 batchHandled = false;
                 break;
             }
         }
         if (batchHandled && count > 0) {
             consumer.commitSync(Duration.ofSeconds(5));
+        } else if (!batchHandled) {
+            sleepQuietly(retryDelayMs);
         }
         return count;
+    }
+
+    private void rewindTo(ConsumerRecord<String, String> record) {
+        try {
+            consumer.seek(new TopicPartition(record.topic(), record.partition()), record.offset());
+        } catch (RuntimeException e) {
+            // A rebalance may have revoked the partition; the uncommitted offset
+            // still guarantees redelivery after the next assignment.
+            LOG.warn("cannot rewind {} to offset {}: {}", topic(), record.offset(), e.getMessage());
+        }
+    }
+
+    private static void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void applyPauseState() {

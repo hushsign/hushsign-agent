@@ -70,7 +70,7 @@ class EmissionConsumerTest {
                 rejectedPayloads.add(rawPayload);
                 rejectedReasons.add(reason);
             }
-        }, new CommandValidator(), CLOCK);
+        }, new CommandValidator(), CLOCK, 0L);
         kafka.rebalance(List.of(tp0)); // the group leader assigns the topic partition
     }
 
@@ -156,20 +156,20 @@ class EmissionConsumerTest {
     }
 
     @Test
-    void handlerFailureLeavesTheBatchUncommitted() {
-        failuresBeforeSuccess.set(1);
+    void handlerFailureRewindsAndRetriesTheSameRecordWithoutARebalance() {        failuresBeforeSuccess.set(1);
         String json = commandJson("5c9f7a2e-66f1-4b1f-9e7f-1f2a3b4c5d6e", NOW.minusSeconds(10), NOW.plusSeconds(600));
         deliver(json, 0);
 
         assertEquals(1, consumer.pollOnce(Duration.ZERO));
         assertNull(kafka.committed(tp0), "no commit after a handler failure");
         assertEquals(0, consumer.deliveredCount());
+        assertEquals(0L, kafka.position(tp0),
+                "the consumer must rewind to the failed offset (otherwise the record is lost until restart)");
 
-        // a real broker redelivers the uncommitted batch after a rebalance
-        kafka.seek(tp0, 0);
+        // The broker redelivers from the rewound position; no manual seek needed.
         deliver(json, 0);
         assertEquals(1, consumer.pollOnce(Duration.ZERO));
-        assertEquals(1, commands.size());
+        assertEquals(1, commands.size(), "the failed record must be retried in-process");
         assertEquals(1L, kafka.committed(tp0).offset());
     }
 
