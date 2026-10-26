@@ -24,7 +24,7 @@ import java.util.UUID;
  * spooling (fail fast, never spool garbage); {@code failureCause} is
  * truncated to the wire limit of 255 chars.
  */
-public final class TransmissionProducer {
+public final class TransmissionProducer implements TransmissionRecorder {
 
     private final String gatewayId;
     private final String modemId;
@@ -59,8 +59,7 @@ public final class TransmissionProducer {
                                      String failureCause, String pduHex, Instant requestedAt) {
         Objects.requireNonNull(command, "command");
         Objects.requireNonNull(outcome, "outcome");
-        Objects.requireNonNull(requestedAt, "requestedAt");
-        TransmissionResult result = new TransmissionResult(
+        Objects.requireNonNull(requestedAt, "requestedAt");        TransmissionResult result = new TransmissionResult(
                 "1",
                 UUID.randomUUID().toString(),
                 command.emissionId(),
@@ -82,5 +81,11 @@ public final class TransmissionProducer {
 
     private static String truncate(String cause) {
         return cause.length() > 255 ? cause.substring(0, 255) : cause;
+    }
+
+    /** {@link TransmissionRecorder}: an attempt that produced no PDU. */
+    @Override
+    public void record(EmissionCommand command, String outcome, String failureCause, Instant requestedAt) {
+        report(command, outcome, failureCause, null, requestedAt);
     }
 }
