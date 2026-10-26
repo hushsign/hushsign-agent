@@ -22,6 +22,14 @@
     "sequence": { "type": "integer", "minimum": 0 },
     "uptimeSeconds": { "type": "integer", "minimum": 0 },
     "sentAt": { "type": "string", "format": "date-time" },
+    "bootId": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "supportedTechniques": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["SILENT_TP0", "WAP_PUSH_EMPTY", "WAP_PUSH_SL", "WAP_PUSH_SI", "MWI_TOGGLE", "MMS_NOTIFY_EMPTY", "MWI_DEACTIVATE"]
+      }
+    },
     "modems": {
       "type": "array",
       "items": {

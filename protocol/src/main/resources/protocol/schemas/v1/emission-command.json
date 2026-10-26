@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://hushsign.dev/schemas/v1/emission-command.json",
   "title": "EmissionCommand",
-  "description": "Platform -> agent command asking a gateway to execute one technique against one target. Published on hs.emissions.{operator}, keyed by msisdn. Enums are append-only: new technique codes may be added, existing ones never removed or renamed.",
+  "description": "Platform -> agent command asking a gateway to execute one technique against one target. Published on hs.emissions.{operator}, keyed by msisdn. Enums are append-only: new technique codes may be added, existing ones never removed or renamed. warrantTermRef (optional, ADR-0010) names the granted warrant term that authorises the emission; v1 consumers ignore it.",
   "type": "object",
   "required": [
     "protocolVersion",
@@ -33,6 +33,7 @@
     "attempt": { "type": "integer", "minimum": 1 },
     "maxAttempts": { "type": "integer", "minimum": 1 },
     "issuedAt": { "type": "string", "format": "date-time" },
-    "expiresAt": { "type": "string", "format": "date-time" }
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "warrantTermRef": { "type": ["string", "null"], "maxLength": 64 }
   }
 }

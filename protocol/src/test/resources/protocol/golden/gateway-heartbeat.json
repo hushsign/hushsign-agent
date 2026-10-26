@@ -33,5 +33,7 @@
     "transmissionsAccepted": 2,
     "transmissionsRejected": 0,
     "emissionsExpired": 1
-  }
+  },
+  "bootId": "9f1d5c22-3f1a-4b6e-8f4c-0d6b7a1e2c33",
+  "supportedTechniques": ["SILENT_TP0", "WAP_PUSH_EMPTY", "MMS_NOTIFY_EMPTY", "MWI_DEACTIVATE"]
 }

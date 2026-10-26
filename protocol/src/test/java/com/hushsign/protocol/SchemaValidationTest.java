@@ -80,6 +80,33 @@ class SchemaValidationTest {
     }
 
     @Test
+    void overlongWarrantTermRefIsRejected() {
+        ObjectNode node = (ObjectNode) ProtocolJson.tree(
+                GoldenPayloads.load("emission-command.json"));
+        node.put("warrantTermRef", "t".repeat(65));
+        assertThrows(ProtocolValidationException.class,
+                () -> validator.validate(MessageType.EMISSION_COMMAND, node));
+    }
+
+    @Test
+    void aCommandWithoutWarrantTermRefStillValidates() {
+        // Additive contract: the term reference is optional (ADR-0010).
+        ObjectNode node = (ObjectNode) ProtocolJson.tree(
+                GoldenPayloads.load("emission-command.json"));
+        node.remove("warrantTermRef");
+        assertDoesNotThrow(() -> validator.validate(MessageType.EMISSION_COMMAND, node));
+    }
+
+    @Test
+    void heartbeatSupportedTechniquesMustComeFromTheCatalog() {
+        ObjectNode node = (ObjectNode) ProtocolJson.tree(
+                GoldenPayloads.load("gateway-heartbeat.json"));
+        node.putArray("supportedTechniques").add("SILENT_TP0").add("LASER_PING");
+        assertThrows(ProtocolValidationException.class,
+                () -> validator.validate(MessageType.GATEWAY_HEARTBEAT, node));
+    }
+
+    @Test
     void malformedUuidIsRejected() {
         ObjectNode node = (ObjectNode) ProtocolJson.tree(
                 GoldenPayloads.load("emission-command.json"));
