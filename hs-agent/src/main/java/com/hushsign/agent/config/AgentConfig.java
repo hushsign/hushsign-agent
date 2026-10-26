@@ -59,7 +59,7 @@ public record AgentConfig(
     public record DedupeConfig(int maxEntries) {
     }
 
-    public record SpoolConfig(String path) {
+    public record SpoolConfig(String path, long maxBytes) {
     }
 
     public record PolicyConfig(String path) {

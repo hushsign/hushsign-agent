@@ -7,6 +7,10 @@ package com.hushsign.agent.runtime.spool;
  */
 public class SpoolException extends RuntimeException {
 
+    public SpoolException(String message) {
+        super(message);
+    }
+
     public SpoolException(String message, Throwable cause) {
         super(message, cause);
     }

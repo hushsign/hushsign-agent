@@ -71,12 +71,12 @@ public final class SimulatedAgentApp {
                 List.of(operator),
                 workDir.toString(),
                 new AgentConfig.KafkaConfig(bootstrap, GATEWAY_ID,
-                        new AgentConfig.SecurityConfig("PLAINTEXT", null, null, null, null)),
+                        new AgentConfig.SecurityConfig("PLAINTEXT", null, null, null, null, null)),
                 new AgentConfig.ModemsConfig(false, List.of(), 115_200, 1_500, 50, 50, 2, 3,
                         null, "FULL_HEX"),
                 new AgentConfig.HeartbeatConfig(30),
                 new AgentConfig.DedupeConfig(10_000),
-                new AgentConfig.SpoolConfig("spool.jsonl"),
+                new AgentConfig.SpoolConfig("spool.jsonl", 64L * 1024 * 1024),
                 new AgentConfig.PolicyConfig("policy.yaml"));
     }
 }

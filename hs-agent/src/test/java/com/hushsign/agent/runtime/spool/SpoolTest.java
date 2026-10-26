@@ -149,4 +149,77 @@ class SpoolTest {
         assertEquals(1, spool.size(), "the valid prefix survives a torn tail");
         assertEquals("k1", spool.peekAll().get(0).key());
     }
+
+    @Test
+    void theByteCapIsEnforcedAndNothingIsLost() {
+        Spool spool = Spool.open(file(), 200);
+        enqueue(spool, "t", "k1", "{\"n\":1}");
+
+        SpoolException e = assertThrows(SpoolException.class,
+                () -> spool.enqueue("t", "k2", "{\"padding\":\"" + "x".repeat(300) + "\"}"));
+        assertTrue(e.getMessage().contains("spool is full"), e.getMessage());
+        assertEquals(1, spool.size(), "the rejected record must not be buffered");
+        assertEquals(1, Spool.open(file(), 400).size(), "and it must not be on disk either");
+    }
+
+    @Test
+    void aPermanentlyRejectedRecordIsQuarantinedInsteadOfBlockingTheSpool() throws IOException {
+        Spool spool = Spool.open(file());
+        enqueue(spool, "t", "poison", "{\"n\":1}");
+        enqueue(spool, "t", "k2", "{\"n\":2}");
+
+        List<String> sent = new ArrayList<>();
+        SpoolSender sender = record -> {
+            if ("poison".equals(record.key())) {
+                throw new org.apache.kafka.common.errors.RecordTooLargeException("too large");
+            }
+            sent.add(record.key());
+        };
+
+        // A non-retriable failure is retried a few times, then moved aside.
+        for (int i = 0; i < Spool.QUARANTINE_AFTER - 1; i++) {
+            assertEquals(0, spool.flushTo(sender), "attempt " + (i + 1) + " must not quarantine yet");
+        }
+        assertEquals(0, spool.quarantined());
+
+        // The last attempt quarantines the poison record and drains the healthy one.
+        assertEquals(1, spool.flushTo(sender));
+        assertEquals(List.of("poison"), readLines(spool.poisonFile()).stream()
+                .map(line -> line.contains("poison") ? "poison" : line).toList());
+        assertEquals(1, spool.quarantined());
+        assertEquals(List.of("k2"), sent);
+        assertEquals(0, spool.size());
+    }
+
+    @Test
+    void aBrokerOutageIsNeverQuarantined() {
+        Spool spool = Spool.open(file());
+        enqueue(spool, "t", "k1", "{\"n\":1}");
+
+        SpoolSender outage = record -> {
+            throw new java.util.concurrent.TimeoutException("broker unreachable");
+        };
+        for (int i = 0; i < Spool.QUARANTINE_AFTER * 2; i++) {
+            assertEquals(0, spool.flushTo(outage));
+        }
+        assertEquals(0, spool.quarantined(), "an outage must keep every record");
+        assertEquals(1, spool.size());
+    }
+
+    @Test
+    void retriableKafkaErrorsAreNotPermanent() {
+        assertTrue(Spool.isPermanent(new RuntimeException(
+                new org.apache.kafka.common.errors.RecordTooLargeException("too large"))));
+        assertTrue(!Spool.isPermanent(new RuntimeException(
+                new org.apache.kafka.common.errors.TimeoutException("timeout"))));
+        assertTrue(!Spool.isPermanent(new java.io.IOException("connection reset")));
+    }
+
+    private static List<String> readLines(Path path) {
+        try {
+            return Files.readAllLines(path);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
 }

@@ -40,6 +40,8 @@ dedupe:
 
 spool:
   path: spool
+  maxBytes: 67108864           # 64 MiB; the spool refuses new records above this
+                               # rather than filling the SD card or dropping evidence
 
 policy:
   path: policy.yaml

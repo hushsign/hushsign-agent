@@ -104,7 +104,8 @@ public final class AgentRuntime implements AutoCloseable {
         Path workDir = Path.of(config.workDir()).toAbsolutePath();
         ensureDirectory(workDir);
 
-        Spool spool = Spool.open(workDir.resolve(config.spool().path()).normalize());
+        Spool spool = Spool.open(workDir.resolve(config.spool().path()).normalize(),
+                config.spool().maxBytes());
         DedupeStore dedupe = DedupeStore.open(
                 workDir.resolve("dedupe.ids"), config.dedupe().maxEntries());
         CancellationStore cancels = CancellationStore.open(

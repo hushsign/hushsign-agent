@@ -48,7 +48,7 @@ public final class AgentConfigLoader {
             "maxConsecutiveErrors", "simPin", "pduSubmission");
     private static final Set<String> HEARTBEAT_KEYS = Set.of("intervalSeconds");
     private static final Set<String> DEDUPE_KEYS = Set.of("maxEntries");
-    private static final Set<String> SPOOL_KEYS = Set.of("path");
+    private static final Set<String> SPOOL_KEYS = Set.of("path", "maxBytes");
     private static final Set<String> POLICY_KEYS = Set.of("path");
 
     private AgentConfigLoader() {
@@ -151,7 +151,12 @@ public final class AgentConfigLoader {
 
         Map<String, Object> spool = section(root, "spool");
         checkKeys(spool, SPOOL_KEYS, "spool.");
-        SpoolConfig spoolConfig = new SpoolConfig(str(spool, "spool.", "path", env, "spool"));
+        long spoolMaxBytes = longVal(spool, "spool.", "maxBytes", env, 64L * 1024 * 1024);
+        if (spoolMaxBytes < 1) {
+            throw new ConfigException("spool.maxBytes must be >= 1, got " + spoolMaxBytes);
+        }
+        SpoolConfig spoolConfig = new SpoolConfig(
+                str(spool, "spool.", "path", env, "spool"), spoolMaxBytes);
 
         Map<String, Object> policy = section(root, "policy");
         checkKeys(policy, POLICY_KEYS, "policy.");
@@ -207,19 +212,32 @@ public final class AgentConfigLoader {
 
     private static int intVal(Map<String, Object> map, String path, String key,
                               Map<String, String> env, int defaultValue) {
+        return (int) longVal(map, path, key, env, defaultValue);
+    }
+
+    private static long longVal(Map<String, Object> map, String path, String key,
+                                Map<String, String> env, long defaultValue) {
         String name = envKey(path, key);
         String envValue = env.get(name);
         if (envValue != null) {
-            return parseInt(name, envValue);
+            return parseLong(name, envValue);
         }
         Object value = map.get(key);
         if (value == null) {
             return defaultValue;
         }
         if (value instanceof Number number) {
-            return number.intValue();
+            return number.longValue();
         }
-        return parseInt(path + key, String.valueOf(value));
+        return parseLong(path + key, String.valueOf(value));
+    }
+
+    private static long parseLong(String name, String raw) {
+        try {
+            return Long.parseLong(raw.trim());
+        } catch (NumberFormatException e) {
+            throw new ConfigException(name + " must be an integer, got '" + raw + "'");
+        }
     }
 
     private static boolean bool(Map<String, Object> map, String path, String key,
