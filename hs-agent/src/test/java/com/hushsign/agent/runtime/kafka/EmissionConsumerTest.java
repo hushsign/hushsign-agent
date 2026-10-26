@@ -156,6 +156,20 @@ class EmissionConsumerTest {
     }
 
     @Test
+    void anEmissionForAnotherOperatorIsRejected() {
+        String foreign = ProtocolJson.write(new EmissionCommand(
+                "1", "5c9f7a2e-66f1-4b1f-9e7f-1f2a3b4c5d6e", "b4c1a2d3-84f5-4a4c-8c0f-112233445566",
+                "w-2026-0142", "t-8842", "+40722111222", "SILENT_TP0", "226-01", 1, 3,
+                NOW.minusSeconds(10), NOW.plusSeconds(600)));
+        deliver(foreign, 0);
+
+        assertEquals(1, consumer.pollOnce(Duration.ZERO));
+        assertEquals(0, consumer.deliveredCount(), "a misrouted emission must never be sent");
+        assertEquals(List.of(EmissionConsumer.RejectReason.INVALID), rejectedReasons);
+        assertEquals(1L, kafka.committed(tp0).offset(), "the rejection is terminal");
+    }
+
+    @Test
     void handlerFailureRewindsAndRetriesTheSameRecordWithoutARebalance() {        failuresBeforeSuccess.set(1);
         String json = commandJson("5c9f7a2e-66f1-4b1f-9e7f-1f2a3b4c5d6e", NOW.minusSeconds(10), NOW.plusSeconds(600));
         deliver(json, 0);

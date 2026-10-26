@@ -210,7 +210,18 @@ public final class EmissionConsumer implements AutoCloseable {
                 continue;
             }
             try {
-                handler.onCommand(ProtocolJson.read(raw, EmissionCommand.class));
+                EmissionCommand command = ProtocolJson.read(raw, EmissionCommand.class);
+                if (!operator.equals(command.operator())) {
+                    // A misrouted emission must not be sent under another operator:
+                    // the transmission would be attributed to the wrong network and
+                    // the routing evidence would lie.
+                    LOG.error("discarding emission {} on {}: payload says operator {}",
+                            command.emissionId(), topic(), command.operator());
+                    handler.onRejected(raw, RejectReason.INVALID);
+                    rejected.incrementAndGet();
+                    continue;
+                }
+                handler.onCommand(command);
                 delivered.incrementAndGet();
             } catch (Exception e) {
                 // Without the rewind the position would already be past this
