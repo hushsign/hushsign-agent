@@ -4,6 +4,7 @@ import com.hushsign.protocol.CommandValidator;
 import com.hushsign.protocol.ProtocolJson;
 import com.hushsign.protocol.Topics;
 import com.hushsign.protocol.v1.EmissionCommand;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.MockConsumer;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
@@ -18,6 +19,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -99,6 +101,16 @@ class EmissionConsumerTest {
         assertEquals(1, consumer.deliveredCount());
         assertEquals(0, rejectedPayloads.size());
         assertEquals(1L, kafka.committed(tp0).offset(), "batch must be committed after handling");
+    }
+
+    @Test
+    void subscriberPropertiesAreManualCommitAndStartAtLatest() {
+        Properties props = EmissionConsumer.consumerProperties("kafka:9092", OPERATOR);
+
+        assertEquals("gw-" + OPERATOR, props.get(ConsumerConfig.GROUP_ID_CONFIG));
+        assertEquals("false", props.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG));
+        assertEquals("latest", props.get(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG),
+                "a fresh gateway must not replay the whole retention window");
     }
 
     @Test

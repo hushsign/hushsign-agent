@@ -85,15 +85,26 @@ public final class EmissionConsumer implements AutoCloseable {
     }
 
     private static KafkaConsumer<String, String> buildConsumer(String bootstrapServers, String operator) {
+        return new KafkaConsumer<>(consumerProperties(bootstrapServers, operator));
+    }
+
+    /**
+     * Properties of the emission consumer — package-visible so tests can assert
+     * the group, the manual commit and the offset policy without a broker.
+     */
+    static Properties consumerProperties(String bootstrapServers, String operator) {
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.GROUP_ID_CONFIG, Topics.gatewayGroup(operator));
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        // A freshly enrolled gateway must not replay the whole 7-day emission topic:
+        // every replayed command would be refused by the freshness gate anyway, in
+        // one burst. New work arrives with the subscription.
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
         props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "10");
-        return new KafkaConsumer<>(props);
+        return props;
     }
 
     /** The emission topic this consumer serves. */
