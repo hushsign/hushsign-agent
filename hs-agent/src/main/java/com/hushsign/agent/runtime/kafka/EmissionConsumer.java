@@ -110,7 +110,10 @@ public final class EmissionConsumer implements AutoCloseable {
                 // A freshly enrolled gateway must not replay the whole 7-day emission
                 // topic: every replayed command would be refused by the freshness gate
                 // anyway, in one burst. New work arrives with the subscription.
-                "latest", 10);
+                "latest",
+                // One record per poll: sends are serialized by the modem, and a small
+                // batch keeps the commit/rewind window tight.
+                1);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         return props;
     }

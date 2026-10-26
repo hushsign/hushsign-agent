@@ -92,6 +92,9 @@ class KafkaClientSettingsTest {
         assertEquals("latest", consumer.get("auto.offset.reset"));
         assertEquals("7", consumer.get("max.poll.records"));
         assertEquals("false", consumer.get("enable.auto.commit"));
+        assertEquals(String.valueOf(KafkaClientSettings.MAX_POLL_INTERVAL_MS),
+                consumer.get("max.poll.interval.ms"),
+                "a serial modem send must not trigger a rebalance mid-batch");
         assertEquals("org.apache.kafka.common.serialization.StringDeserializer",
                 consumer.get("value.deserializer"));
 
@@ -99,6 +102,16 @@ class KafkaClientSettingsTest {
         assertEquals("all", producer.get("acks"));
         assertEquals("org.apache.kafka.common.serialization.StringSerializer",
                 producer.get("key.serializer"));
+    }
+
+    @Test
+    void emissionConsumerPollsOneRecordAtATime() {
+        Properties props = EmissionConsumer.consumerProperties(
+                kafka("PLAINTEXT", null, null, null, null, null), "226-10");
+
+        assertEquals("1", props.get("max.poll.records"));
+        assertEquals("600000", props.get("max.poll.interval.ms"));
+        assertEquals("gw-226-10", props.get("group.id"));
     }
 
     private static AgentConfig.KafkaConfig kafka(String protocol, String mechanism, String user,

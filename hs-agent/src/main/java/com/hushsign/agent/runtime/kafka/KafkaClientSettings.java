@@ -78,8 +78,16 @@ public final class KafkaClientSettings {
         props.put("enable.auto.commit", "false");
         props.put("auto.offset.reset", autoOffsetReset);
         props.put("max.poll.records", Integer.toString(maxPollRecords));
+        // One modem serializes every send, so a batch is processed one record at a
+        // time; the session must survive the longest possible serial operation
+        // (response timeout × attempts) instead of triggering a rebalance in the
+        // middle of it. The default 5 min is too tight for a 30 s modem timeout.
+        props.put("max.poll.interval.ms", Integer.toString(MAX_POLL_INTERVAL_MS));
         return props;
     }
+
+    /** How long a single poll iteration may take before the broker rebalances. */
+    public static final int MAX_POLL_INTERVAL_MS = 600_000;
 
     /** Producer properties: {@link #common} plus serializers and {@code acks=all}. */
     public static Properties producer(AgentConfig.KafkaConfig kafka) {
