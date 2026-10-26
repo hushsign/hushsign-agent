@@ -18,6 +18,11 @@ import java.util.Set;
  * <ul>
  *   <li>{@link #tryClaim} is atomic and immediately persisted: {@code true}
  *       only for the first claim of an id, {@code false} for redeliveries.</li>
+ *   <li>The claim key is {@code emissionId:attempt} (P1-S7): retries reuse the
+ *       {@code emissionId} with {@code attempt+1}, so keying on the id alone
+ *       would silently drop every retry.</li>
+ *   <li>{@link #release} removes a claim whose attempt never reached the modem,
+ *       so a redelivery after a reporting failure can still retry.</li>
  *   <li>One append-only line per claim; the window keeps the newest
  *       {@code maxEntries} ids, evicting the oldest and rewriting the file
  *       (atomic temp-file move) so the file always matches the window.</li>
@@ -76,6 +81,29 @@ public final class DedupeStore {
 
     public synchronized int size() {
         return ids.size();
+    }
+
+    /**
+     * Releases a claim that was persisted but produced no execution (the attempt
+     * failed before the modem was touched), so the redelivery may retry.
+     *
+     * @return {@code true} when the claim existed and was removed
+     * @throws DedupeException when the removal cannot be persisted
+     */
+    public synchronized boolean release(String emissionId) {
+        if (emissionId == null || emissionId.isBlank()) {
+            throw new IllegalArgumentException("emissionId must not be blank");
+        }
+        if (!ids.remove(emissionId)) {
+            return false;
+        }
+        try {
+            rewriteFile();
+        } catch (IOException e) {
+            ids.add(emissionId); // roll back: memory must keep matching the disk
+            throw new DedupeException("cannot persist dedupe release for " + emissionId, e);
+        }
+        return true;
     }
 
     public synchronized Set<String> snapshot() {
