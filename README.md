@@ -11,8 +11,8 @@ customer-owned policy file, and records a tamper-evident hash-chained audit log.
 | Module | Contents |
 |---|---|
 | `hs-gsm` | modernized SMSLib v4: PDU codec + serial/AT driver behaviour |
-| `hs-gsm-technique` | technique generators (`SILENT_TP0`, `WAP_PUSH_*`, `MWI_*`, …) with golden PDU tests |
-| `hs-agent` | runtime: Kafka I/O, modem pool, execution loop, policy engine, audit chain, dedupe, spool, heartbeat |
+| `hs-gsm-technique` | technique generators (`SILENT_TP0`, `WAP_PUSH_EMPTY`, `MMS_NOTIFY_EMPTY`, `MWI_DEACTIVATE`) with golden PDU tests |
+| `hs-agent` | runtime: `AgentMain` + `AgentRuntime` (Kafka I/O, dedupe, cancellation, policy, execution, spool, heartbeat) |
 | `simulator` | mock-modem harness for CI and demos |
 | `dist` | multi-arch container, systemd unit, example configs, install script |
 
