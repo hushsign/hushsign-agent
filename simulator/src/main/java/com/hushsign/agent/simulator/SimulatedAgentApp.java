@@ -15,6 +15,7 @@ import com.hushsign.agent.runtime.transmission.TransmissionProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Clock;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
@@ -73,7 +74,7 @@ public final class SimulatedAgentApp {
                 new TransmissionProducer(GATEWAY_ID, SIM_ID, SIM_ID, spool);
         EmissionExecutor executor = new EmissionExecutor(modem::sendPdu, transmissions);
         EmissionHandler handler = new DedupingEmissionHandler(dedupe,
-                new PolicyCheckingEmissionHandler(new AcceptAllPolicyProvider(), executor));
+                new PolicyCheckingEmissionHandler(new AcceptAllPolicyProvider(), executor, transmissions, Clock.systemUTC()));
         EmissionConsumer consumer = new EmissionConsumer(bootstrap, operator, handler);
         KafkaSpoolSender sender = new KafkaSpoolSender(bootstrap);
 

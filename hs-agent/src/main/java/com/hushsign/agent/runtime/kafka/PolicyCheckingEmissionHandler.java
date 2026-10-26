@@ -2,20 +2,25 @@ package com.hushsign.agent.runtime.kafka;
 
 import com.hushsign.agent.runtime.policy.PolicyDecision;
 import com.hushsign.agent.runtime.policy.PolicyProvider;
+import com.hushsign.agent.runtime.transmission.TransmissionRecorder;
 import com.hushsign.protocol.v1.EmissionCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * P1-S11: the local policy gate in front of the execution pipeline.
  *
  * <p>Wraps the {@link EmissionHandler} chain: an emission is forwarded to the
- * delegate only after {@link PolicyProvider#evaluate} allows it. A rejection
- * — or a provider exception, treated fail-closed as a rejection — is dropped
- * here with a counter, so nothing reaches a modem. P7 reports this path as an
- * explicit {@code BLOCKED_BY_POLICY} transmission instead of only counting.
+ * delegate only after {@link PolicyProvider#evaluate} allows it. A rejection —
+ * or a provider exception, treated fail-closed as a rejection — produces a
+ * {@code BLOCKED_BY_POLICY} transmission and never reaches a modem, so the
+ * platform settles the emission on evidence instead of waiting for a retry to
+ * time out.
  */
 public final class PolicyCheckingEmissionHandler implements EmissionHandler {
 
@@ -23,11 +28,16 @@ public final class PolicyCheckingEmissionHandler implements EmissionHandler {
 
     private final PolicyProvider policy;
     private final EmissionHandler delegate;
+    private final TransmissionRecorder recorder;
+    private final Clock clock;
     private final AtomicLong policyRejections = new AtomicLong();
 
-    public PolicyCheckingEmissionHandler(PolicyProvider policy, EmissionHandler delegate) {
-        this.policy = policy;
-        this.delegate = delegate;
+    public PolicyCheckingEmissionHandler(PolicyProvider policy, EmissionHandler delegate,
+                                         TransmissionRecorder recorder, Clock clock) {
+        this.policy = Objects.requireNonNull(policy, "policy");
+        this.delegate = Objects.requireNonNull(delegate, "delegate");
+        this.recorder = Objects.requireNonNull(recorder, "recorder");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     @Override
@@ -35,10 +45,11 @@ public final class PolicyCheckingEmissionHandler implements EmissionHandler {
         PolicyDecision decision = decisionFor(command);
         if (decision.allowed()) {
             delegate.onCommand(command);
-        } else {
-            policyRejections.incrementAndGet();
-            LOG.warn("policy rejected emission {}: {}", command.emissionId(), decision.reason());
+            return;
         }
+        policyRejections.incrementAndGet();
+        LOG.warn("policy rejected emission {}: {}", command.emissionId(), decision.reason());
+        recorder.record(command, "BLOCKED_BY_POLICY", decision.reason(), Instant.now(clock));
     }
 
     @Override
