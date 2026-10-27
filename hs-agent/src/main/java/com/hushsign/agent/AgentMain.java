@@ -2,6 +2,7 @@ package com.hushsign.agent;
 
 import com.hushsign.agent.config.AgentConfig;
 import com.hushsign.agent.config.AgentConfigLoader;
+import com.hushsign.agent.config.ConfigException;
 import com.hushsign.agent.gsm.modem.Modem;
 import com.hushsign.agent.gsm.modem.ModemConfig;
 import com.hushsign.agent.gsm.modem.ModemException;
@@ -41,10 +42,29 @@ public final class AgentMain {
     public static void main(String[] args) throws Exception {
         if (args.length > 0 && "ctl".equals(args[0])) {
             // The client half of P7-S4: same binary, so an operator on the gateway has the tool
-            // without a second artifact to install.
+            // without a second artifact to install. The token lives in the agent's work
+            // directory, which HS_AGENT_WORKDIR points at (install.sh's launcher sets
+            // /var/lib/hs-agent); without that, `ctl` looked in whatever directory the operator
+            // happened to be standing in and reported "no admin token" from there.
+            String configuredWorkDir = System.getenv("HS_AGENT_WORKDIR");
+            Path workDir = configuredWorkDir == null || configuredWorkDir.isBlank()
+                    ? Path.of(".").toAbsolutePath()
+                    : Path.of(configuredWorkDir).toAbsolutePath();
             System.exit(AdminClient.run(Arrays.copyOfRange(args, 1, args.length),
-                    Path.of(".").toAbsolutePath(), System.out, System.err));
+                    workDir, System.out, System.err));
         }
+        try {
+            run(args);
+        } catch (ConfigException e) {
+            // A configuration error is an operator's problem, not a bug, and the stack trace for
+            // it says nothing an operator can act on. One line, and a distinct exit code so a
+            // wrapper or systemd unit can tell it apart from a crash.
+            LOG.error("{}", e.getMessage());
+            System.exit(2);
+        }
+    }
+
+    private static void run(String[] args) throws Exception {
         if (!LogDirectory.harden(LogDirectory.configured())) {
             LOG.info("log directory is not owner-only; agent.log carries raw SIM identities, so keep it on the device");
         }
