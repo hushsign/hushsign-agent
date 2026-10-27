@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -211,5 +212,22 @@ class HeartbeatProducerTest {
         assertTrue(ProtocolJson.read(sent.get(0), GatewayHeartbeat.class).sequence()
                 < ProtocolJson.read(sent.get(1), GatewayHeartbeat.class).sequence());
         assertEquals(0, spool.size());
+    }
+
+    @Test
+    void aModemWithNoOptionalFieldsStillProducesAValidHeartbeat() {
+        // Field finding (P7-S9): the runtime built ModemInfo with null memoryStore and null
+        // signalQuality. Jackson wrote "memoryStore": null, the schema types that field as a
+        // string, and the validator rejected the whole heartbeat - so the gateway sent nothing
+        // to the fleet, every 30 seconds, and only a warning in a log said so.
+        modems = List.of(new GatewayHeartbeat.ModemInfo(
+                "353142041395966", "K3765", "huawei",
+                GatewayHeartbeat.ModemInfo.Status.READY, null, null, null));
+
+        GatewayHeartbeat heartbeat = producer.pulse();
+
+        validator.validate(MessageType.GATEWAY_HEARTBEAT, ProtocolJson.write(heartbeat));
+        assertFalse(ProtocolJson.write(heartbeat).contains("null"),
+                "an absent optional field is omitted, not serialized as null");
     }
 }

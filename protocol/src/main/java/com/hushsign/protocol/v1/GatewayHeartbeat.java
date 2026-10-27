@@ -1,6 +1,7 @@
 package com.hushsign.protocol.v1;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.Instant;
 import java.util.List;
@@ -34,8 +35,16 @@ public record GatewayHeartbeat(
         String bootId,
         List<String> supportedTechniques) {
 
-    /** One modem attached to the gateway. */
+    /**
+     * One modem attached to the gateway.
+     *
+     * <p>{@code NON_NULL} because the wire schema types {@code memoryStore} and {@code portHint}
+     * as strings: Jackson wrote {@code "memoryStore": null} and the validator rejected the whole
+     * heartbeat, so a gateway with a modem that has no SMS memory store reported nothing at all.
+     * Omitting an absent optional field is what the schema expects.
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record ModemInfo(
             String serial,
             String model,
