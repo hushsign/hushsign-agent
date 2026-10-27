@@ -219,6 +219,11 @@ class HeartbeatProducerTest {
             public Map<String, Long> counters() {
                 return Map.of();
             }
+
+            @Override
+            public GatewayHeartbeat.PolicyInfo policy() {
+                return null;
+            }
         }, spool, CLOCK);
 
         assertThrows(IllegalArgumentException.class, badPolicy::pulse);

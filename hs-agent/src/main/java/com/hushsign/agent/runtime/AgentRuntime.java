@@ -182,7 +182,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         CancellationConsumer cancellationConsumer =
                 new CancellationConsumer(config.kafka(), config.gatewayId(), cancels);
 
-        HeartbeatSource source = new RuntimeHeartbeatSource(config, configFile, policyFile, modem, consumers,
+        HeartbeatSource source = new RuntimeHeartbeatSource(config, configFile, policy, policyFile, modem, consumers,
                 Instant.now(), agentVersion);
         HeartbeatProducer heartbeat = new HeartbeatProducer(source, spool);
 
@@ -479,6 +479,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
 
         private final AgentConfig config;
         private final Path configFile;
+        private final PolicyEngine policyEngine;
         private final Modem modem;
         private final List<EmissionConsumer> consumers;
         private final Instant startedAt;
@@ -486,11 +487,12 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         private final String policyHash;
         private final String configHash;
 
-        RuntimeHeartbeatSource(AgentConfig config, Path configFile, Path policyFile, Modem modem,
-                               List<EmissionConsumer> consumers, Instant startedAt,
+        RuntimeHeartbeatSource(AgentConfig config, Path configFile, PolicyEngine policyEngine, Path policyFile,
+                               Modem modem, List<EmissionConsumer> consumers, Instant startedAt,
                                String agentVersion) {
             this.config = config;
             this.configFile = configFile;
+            this.policyEngine = policyEngine;
             this.modem = modem;
             this.consumers = consumers;
             this.startedAt = startedAt;
@@ -527,7 +529,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
          */
         @Override
         public GatewayHeartbeat.PolicyInfo policy() {
-            PolicySettings inForce = policy.settings();
+            PolicySettings inForce = policyEngine.settings();
             PolicySettings.QuietHours quiet = inForce.quietHours();
             return new GatewayHeartbeat.PolicyInfo(
                     inForce.killSwitch(),
