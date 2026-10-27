@@ -15,7 +15,10 @@ import com.hushsign.agent.runtime.kafka.EmissionConsumer;
 import com.hushsign.agent.runtime.kafka.EmissionHandler;
 import com.hushsign.agent.runtime.kafka.KafkaSpoolSender;
 import com.hushsign.agent.runtime.kafka.PolicyCheckingEmissionHandler;
-import com.hushsign.agent.runtime.policy.AcceptAllPolicyProvider;
+import com.hushsign.agent.runtime.policy.engine.HourlyCounter;
+import com.hushsign.agent.runtime.policy.engine.PolicyEngine;
+import com.hushsign.agent.runtime.policy.engine.PolicySettings;
+import com.hushsign.agent.runtime.policy.engine.PolicySettingsLoader;
 import com.hushsign.agent.runtime.spool.Spool;
 import com.hushsign.agent.runtime.transmission.TransmissionProducer;
 import com.hushsign.protocol.v1.GatewayHeartbeat;
@@ -115,12 +118,26 @@ public final class AgentRuntime implements AutoCloseable {
         TransmissionProducer transmissions = new TransmissionProducer(
                 config.gatewayId(), serialOf(modem), null, spool);
 
+        Clock clock = Clock.systemUTC();
+        // P7-S1: the policy is loaded from disk before any consumer starts, and a missing or
+        // invalid file stops the agent. An agent that cannot say what it is allowed to send is
+        // an agent that must not send.
+        PolicySettings policySettings = PolicySettingsLoader.load(
+                workDir.resolve(config.policy().path()).normalize());
+        PolicyEngine policy = new PolicyEngine(policySettings, config.gatewayId(),
+                new HourlyCounter(clock), clock);
+        LOG.info("policy loaded from {}: killSwitch={} techniques={} operators={} caps={}/{}/{} quietHours={}",
+                policySettings, policySettings.killSwitch(), policySettings.allowedTechniques(),
+                policySettings.allowedOperators(), policySettings.caps().perTargetPerHour(),
+                policySettings.caps().perOperatorPerHour(), policySettings.caps().perGatewayPerHour(),
+                policySettings.quietHours());
+
         EmissionHandler chain = new DedupingEmissionHandler(dedupe,
                 new CancellingEmissionHandler(cancels,
-                        new PolicyCheckingEmissionHandler(new AcceptAllPolicyProvider(),
+                        new PolicyCheckingEmissionHandler(policy,
                                 new EmissionExecutor(modem::sendPdu, transmissions),
-                                transmissions, Clock.systemUTC()),
-                        transmissions, Clock.systemUTC()));
+                                transmissions, clock),
+                        transmissions, clock));
 
         List<EmissionConsumer> consumers = new ArrayList<>();
         for (String operator : config.operators()) {

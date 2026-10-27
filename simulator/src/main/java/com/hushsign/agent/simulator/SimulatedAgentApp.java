@@ -7,6 +7,8 @@ import com.hushsign.agent.runtime.AgentRuntime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -39,6 +41,7 @@ public final class SimulatedAgentApp {
         String bootstrap = System.getenv().getOrDefault("HS_KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
         Path workDir = Path.of("target", "sim-agent").toAbsolutePath();
         LOG.info("workdir={} (user.dir={})", workDir, System.getProperty("user.dir"));
+        writePermissivePolicy(workDir);
 
         LOG.info("starting simulated agent: gateway={} operator={} scenario={} broker={}",
                 GATEWAY_ID, operator, scenario, bootstrap);
@@ -62,6 +65,20 @@ public final class SimulatedAgentApp {
         } finally {
             runtime.close();
         }
+    }
+
+    /**
+     * The runtime refuses to start without a policy file (P7-S1 fail-closed), so the
+     * simulator writes an explicit permissive one: it is a development rig, and the file is
+     * visible in the work directory rather than hidden in code.
+     */
+    static void writePermissivePolicy(Path workDir) throws IOException {
+        Files.createDirectories(workDir);
+        Path policy = workDir.resolve("policy.yaml");
+        Files.writeString(policy, """
+                # Simulated agent (P7-S1): everything allowed, no caps, no quiet hours.
+                killSwitch: false
+                """);
     }
 
     /** Runtime wiring for the simulator: one mock modem, one operator, disk spool. */

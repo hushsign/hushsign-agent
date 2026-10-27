@@ -1,0 +1,72 @@
+package com.hushsign.agent.runtime.policy.engine;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import org.junit.jupiter.api.Test;
+
+/** P7-S1: the ceiling counters move with the wall clock and do not grow without bound. */
+class HourlyCounterTest {
+
+    /** A clock the test can move, so an hour boundary is something we can step over. */
+    private static final class MovableClock extends Clock {
+
+        private Instant now = Instant.parse("2026-10-27T10:00:00Z");
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
+
+        void advance(Duration by) {
+            now = now.plus(by);
+        }
+    }
+
+    private final MovableClock clock = new MovableClock();
+    private final HourlyCounter counter = new HourlyCounter(clock);
+
+    @Test
+    void countsWithinTheHour() {
+        assertEquals(1, counter.incrementAndGet("target:+40700000001"));
+        assertEquals(2, counter.incrementAndGet("target:+40700000001"));
+        assertEquals(2, counter.count("target:+40700000001"));
+        assertEquals(0, counter.count("target:+40700000002"), "keys are independent");
+    }
+
+    @Test
+    void theCountStartsAgainInTheNextHour() {
+        counter.incrementAndGet("gateway");
+        counter.incrementAndGet("gateway");
+
+        clock.advance(Duration.ofMinutes(61));
+
+        assertEquals(0, counter.count("gateway"));
+        assertEquals(1, counter.incrementAndGet("gateway"));
+    }
+
+    @Test
+    void aRefusedDecisionCanGiveItsCountBack() {
+        counter.incrementAndGet("operator:226-10");
+
+        counter.decrement("operator:226-10");
+
+        assertEquals(0, counter.count("operator:226-10"));
+        counter.decrement("operator:226-10");
+        assertEquals(0, counter.count("operator:226-10"), "a decrement below zero is a no-op");
+    }
+}
