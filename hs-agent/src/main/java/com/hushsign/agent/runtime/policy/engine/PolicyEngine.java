@@ -155,8 +155,11 @@ public final class PolicyEngine implements PolicyProvider {
     private PolicyDecision caps(EmissionCommand command) {
         PolicySettings.Caps caps = settings.caps();
         List<String> counted = new ArrayList<>();
+        // Keyed on the digits, not on how the number was written: the PDU drops the plus, and
+        // the schema accepts both forms, so "+40700000001" and "40700000001" are one subscriber
+        // with one budget - not two spellings with two. The reason text keeps the original.
         PolicyDecision decision = underCap(caps.perTargetPerHour(), "target " + command.msisdn(),
-                "target:" + command.msisdn(), counted);
+                "target:" + digitsOf(command.msisdn()), counted);
         if (decision.allowed()) {
             decision = underCap(caps.perOperatorPerHour(), "operator " + command.operator(),
                     "operator:" + command.operator(), counted);
@@ -168,6 +171,20 @@ public final class PolicyEngine implements PolicyProvider {
             counted.forEach(counter::decrement);
         }
         return decision;
+    }
+
+    private static String digitsOf(String msisdn) {
+        if (msisdn == null) {
+            return "";
+        }
+        StringBuilder digits = new StringBuilder(msisdn.length());
+        for (int i = 0; i < msisdn.length(); i++) {
+            char c = msisdn.charAt(i);
+            if (c >= '0' && c <= '9') {
+                digits.append(c);
+            }
+        }
+        return digits.toString();
     }
 
     private PolicyDecision underCap(int ceiling, String what, String key, List<String> counted) {

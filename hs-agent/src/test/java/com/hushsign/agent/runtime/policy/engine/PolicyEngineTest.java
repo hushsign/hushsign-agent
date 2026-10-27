@@ -178,6 +178,19 @@ class PolicyEngineTest {
     }
 
     @Test
+    void theSameNumberWrittenTwoWaysSharesOneBudget() {
+        // The PDU drops the plus and the schema accepts both forms, so these are one
+        // subscriber. Keyed on the string, they were two budgets of six.
+        PolicyEngine engine = engine(settings(false, Set.of(), Set.of(), new PolicySettings.Caps(1, 0, 0), null, null));
+
+        assertTrue(engine.evaluate(command("SILENT_TP0", "226-10", "+40700000001", NOW, null)).allowed());
+        PolicyDecision writtenWithoutThePlus =
+                engine.evaluate(command("SILENT_TP0", "226-10", "40700000001", NOW, null));
+
+        assertFalse(writtenWithoutThePlus.allowed(), "one subscriber has one budget, however it is typed");
+    }
+
+    @Test
     void theOperatorCapIgnoresTheTargetBudget() {
         PolicyEngine engine = engine(settings(false, Set.of(), Set.of(), new PolicySettings.Caps(0, 1, 0), null, null));
 
