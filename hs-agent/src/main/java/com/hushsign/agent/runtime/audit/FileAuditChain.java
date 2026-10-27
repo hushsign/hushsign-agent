@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
@@ -169,6 +170,34 @@ public final class FileAuditChain implements AuditLog {
     @Override
     public String location() {
         return directory.toAbsolutePath().toString();
+    }
+
+    @Override
+    public Optional<DigestWindow> window(Instant from, Instant to) {
+        Objects.requireNonNull(from, "from");
+        Objects.requireNonNull(to, "to");
+        long count = 0;
+        String head = null;
+        String previous = null;
+        for (Path file : files(directory)) {
+            List<AuditEntry> entries;
+            try {
+                entries = read(file);
+            } catch (IOException e) {
+                LOG.warn("cannot read {} for a digest window: {}", file, e.toString());
+                return Optional.empty();
+            }
+            for (AuditEntry entry : entries) {
+                if (entry.at().isBefore(from)) {
+                    // Everything before the window tells us where the chain stood when it opened.
+                    previous = entry.hash();
+                } else if (entry.at().isBefore(to)) {
+                    count++;
+                    head = entry.hash();
+                }
+            }
+        }
+        return head == null ? Optional.empty() : Optional.of(new DigestWindow(count, head, previous));
     }
 
     @Override

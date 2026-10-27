@@ -20,6 +20,7 @@ import com.hushsign.agent.runtime.kafka.EmissionConsumer;
 import com.hushsign.agent.runtime.kafka.EmissionHandler;
 import com.hushsign.agent.runtime.kafka.KafkaSpoolSender;
 import com.hushsign.agent.runtime.kafka.PolicyCheckingEmissionHandler;
+import com.hushsign.agent.runtime.audit.AuditDigestPublisher;
 import com.hushsign.agent.runtime.audit.AuditLog;
 import com.hushsign.agent.runtime.audit.FileAuditChain;
 import com.hushsign.agent.runtime.policy.engine.HourlyCounter;
@@ -83,6 +84,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
     private final FileAuditChain audit;
     private final AdminState admin;
     private final HeartbeatSource heartbeatSource;
+    private final AuditDigestPublisher digests;
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicLong flushed = new AtomicLong();
     private final Instant startedAt = Instant.now();
@@ -90,6 +92,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
     private final AtomicBoolean heartbeatRunning = new AtomicBoolean();
     private Thread flusher;
     private Thread heartbeatThread;
+    private Thread digestThread;
     private Thread shutdownHook;
 
     private AgentRuntime(String gatewayId, Spool spool, KafkaSpoolSender sender,
@@ -97,7 +100,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
                          HeartbeatProducer heartbeat, HeartbeatSource heartbeatSource,
                          long heartbeatIntervalMs, Modem modem, String agentVersion,
                          PolicyEngine policy, Path policyFile, Path configFile, FileAuditChain audit,
-                         AdminState admin) {
+                         AdminState admin, AuditDigestPublisher digests) {
         this.gatewayId = gatewayId;
         this.spool = spool;
         this.sender = sender;
@@ -113,6 +116,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         this.configFile = configFile;
         this.audit = audit;
         this.admin = admin;
+        this.digests = digests;
     }
 
     /**
@@ -184,7 +188,8 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
 
         AgentRuntime runtime = new AgentRuntime(config.gatewayId(), spool, sender, consumers,
                 cancellationConsumer, heartbeat, source, config.heartbeat().intervalSeconds() * 1000L,
-                modem, agentVersion, policy, policyFile, configFile, audit, adminState);
+                modem, agentVersion, policy, policyFile, configFile, audit, adminState,
+                new AuditDigestPublisher(audit, spool, config.gatewayId(), clock));
         runtime.startThreads();
         runtime.installShutdownHook();
         return runtime;
@@ -195,9 +200,31 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         cancellationConsumer.start();
         startFlusher();
         startHeartbeat();
+        startDigests();
         LOG.info("agent runtime started: gateway={} operators={} workDir={}",
                 gatewayId, consumers.stream().map(EmissionConsumer::topic).toList(),
                 Path.of(spool.file().toString()).getParent());
+    }
+
+    /**
+     * P7-S3: a minute-by-minute tick that does nothing until the clock crosses an hour. The tick
+     * is short so a digest goes out within a minute of the hour rather than at the next restart.
+     */
+    private void startDigests() {
+        digestThread = new Thread(() -> {
+            while (!closed.get() && !Thread.currentThread().isInterrupted()) {
+                try {
+                    digests.pulse().ifPresent(digest -> LOG.info(
+                            "audit digest published for {}..{}: {} entries",
+                            digest.periodStart(), digest.periodEnd(), digest.entryCount()));
+                } catch (RuntimeException e) {
+                    LOG.warn("audit digest failed: {}", e.getMessage());
+                }
+                sleepQuietly(60_000);
+            }
+        }, "hs-agent-audit-digest");
+        digestThread.setDaemon(true);
+        digestThread.start();
     }
 
     /** Flushes the spool to Kafka in order, one iteration per second. */

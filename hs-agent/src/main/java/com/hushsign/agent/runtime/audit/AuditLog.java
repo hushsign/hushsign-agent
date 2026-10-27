@@ -30,6 +30,29 @@ public interface AuditLog {
     boolean status();
 
     /**
+     * Summarises the entries written in {@code [from, to)} (P7-S3).
+     *
+     * <p>{@code chainHead} is the hash of the newest entry in the window and {@code chainPrev} is
+     * the chain head as it stood when the window opened. The platform compares one digest's
+     * {@code chainPrev} with the previous digest's {@code chainHead}: if the two differ, entries
+     * were removed or rewritten in between, and nothing on the device can hide that.
+     *
+     * @return empty when nothing was written in the window, since a digest with no head cannot
+     *         be expressed and an empty hour is not evidence of anything
+     */
+    Optional<DigestWindow> window(Instant from, Instant to);
+
+    /**
+     * The answer for one window.
+     *
+     * @param entryCount how many entries the window contains
+     * @param chainHead  hash of the newest entry in the window
+     * @param chainPrev  chain head when the window opened, or {@code null} for a fresh chain
+     */
+    record DigestWindow(long entryCount, String chainHead, String chainPrev) {
+    }
+
+    /**
      * The verdict of a verification run.
      *
      * @param entries    how many entries were read

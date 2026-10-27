@@ -33,6 +33,11 @@ public final class NoopAuditLog implements AuditLog {
     }
 
     @Override
+    public java.util.Optional<DigestWindow> window(java.time.Instant from, java.time.Instant to) {
+        return java.util.Optional.empty();
+    }
+
+    @Override
     public boolean status() {
         return true;
     }

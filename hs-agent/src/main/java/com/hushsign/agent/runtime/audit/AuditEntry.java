@@ -31,6 +31,13 @@ public record AuditEntry(
 
     public static final String GENESIS = "genesis";
 
+    /**
+     * Where a chain starts: {@code sha256("genesis")}. A digest of the very first hour reports
+     * this as its {@code chainPrev}, which keeps the field 64 lowercase hex — the wire format
+     * cannot express "nothing yet", and a fixed value is easier to verify than a null.
+     */
+    public static final String GENESIS_HASH = hashOf(GENESIS);
+
     public AuditEntry {
         Objects.requireNonNull(at, "at");
         Objects.requireNonNull(gatewayId, "gatewayId");
