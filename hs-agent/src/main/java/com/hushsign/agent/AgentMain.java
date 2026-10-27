@@ -154,11 +154,15 @@ public final class AgentMain {
             for (String port : config.modems().ports()) {
                 try {
                     return Modem.open(factory.open(port), modemConfig);
-                } catch (ModemException e) {
+                } catch (ModemException | RuntimeException e) {
+                    // A port that no longer exists fails here as an unchecked error (the factory
+                    // cannot open it), and it used to take the whole claim down with it: the
+                    // second configured port was never tried, and the operator saw an
+                    // IllegalArgumentException instead of "no modem on this gateway".
                     LOG.warn("no usable modem on {}: {}", port, e.getMessage());
                 }
             }
-            throw new ModemException("none of the configured ports answered: " + config.modems().ports());
+            throw new ModemException(noConfiguredPortAnswered(config.modems().ports(), factory.listPorts()));
         }
 
         String portName = new ModemScanner(factory, modemConfig).scanFirst()
@@ -170,6 +174,25 @@ public final class AgentMain {
                 .orElseThrow(() -> new ModemException("no modem found while scanning serial ports"));
         LOG.info("scan found a modem on {}; running the full init", portName);
         return Modem.open(factory.open(portName), modemConfig);
+    }
+
+    /**
+     * Says which ports the machine does have, not only which ones the file asked for. Without
+     * this the operator reading the journal sees "/dev/ttyUSB0" and has no way to know the dongle
+     * simply came back as /dev/ttyUSB1 after a replug.
+     */
+    static String noConfiguredPortAnswered(List<String> configured, List<String> present) {
+        String message = "none of the configured ports answered: " + configured
+                + "; serial ports present: " + present;
+        if (configured.stream().anyMatch(AgentMain::isEnumerationOrderPath)) {
+            message += ". A /dev/ttyUSB<n> name is an enumeration order, not a device: pin the"
+                    + " /dev/serial/by-id/ path instead and it survives the next replug";
+        }
+        return message;
+    }
+
+    private static boolean isEnumerationOrderPath(String port) {
+        return port.matches("/dev/tty(USB|ACM)\\d+");
     }
 
     static ModemConfig modemConfig(AgentConfig config) {
