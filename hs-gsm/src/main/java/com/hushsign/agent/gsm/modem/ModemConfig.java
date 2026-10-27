@@ -23,11 +23,22 @@ public record ModemConfig(
         return new Builder(gatewayId);
     }
 
+    /**
+     * How long a scan waits for an answer to {@code AT}. A port that speaks AT does so in
+     * milliseconds, so this only decides how long a silent port wastes.
+     */
+    public static final int PROBE_RESPONSE_TIMEOUT_MS = 3_000;
+
     /** Copy with the full modem init (SIM/PIN, registration, PDU mode) skipped — used by port scanning. */
     public ModemConfig probeOnly() {
-        return new ModemConfig(gatewayId, simPin, simPin2, baudRate, openTimeoutMs, probeAttempts,
-                probeRetryDelayMs, responseTimeoutMs, commandWaitMs, pollWaitMs,
-                maxConsecutiveErrors, false, pduSubmission);
+        // Two settings matter here. The response timeout is one: a dongle exposes three ttyUSB
+        // interfaces and usually only one answers AT. The other is the attempt count - a probe
+        // is a single question, and repeating it against a silent port multiplies the wasted
+        // time by the number of commands the probe issues. Together they took a first start on
+        // a real gateway from minutes to seconds per dead port.
+        return new ModemConfig(gatewayId, simPin, simPin2, baudRate, openTimeoutMs, 1,
+                probeRetryDelayMs, Math.min(responseTimeoutMs, PROBE_RESPONSE_TIMEOUT_MS),
+                commandWaitMs, pollWaitMs, maxConsecutiveErrors, false, pduSubmission);
     }
 
     public static final class Builder {

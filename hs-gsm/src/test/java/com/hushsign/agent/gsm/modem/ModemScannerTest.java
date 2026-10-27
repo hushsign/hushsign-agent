@@ -86,4 +86,33 @@ class ModemScannerTest {
 
         assertTrue(found.isEmpty());
     }
+
+    @Test
+    void aProbeDoesNotWaitTheFullCommandTimeout() {
+        // A dongle exposes three interfaces and usually only one answers AT. With the command
+        // timeout of 30 s copied into the probe, the two silent ones cost over a minute each and
+        // the agent looked hung for minutes before it reached the working port.
+        ModemConfig configured = ModemConfig.builder("gw-test").responseTimeoutMs(30_000).build();
+
+        ModemConfig probe = configured.probeOnly();
+
+        assertEquals(ModemConfig.PROBE_RESPONSE_TIMEOUT_MS, probe.responseTimeoutMs());
+        assertEquals(30_000, configured.responseTimeoutMs(), "the real conversation keeps its patience");
+    }
+
+    @Test
+    void aProbeAsksOnce() {
+        ModemConfig configured = ModemConfig.builder("gw-test").probeAttempts(3).build();
+
+        assertEquals(1, configured.probeOnly().probeAttempts(),
+                "a silent port is not a modem the second time either");
+        assertEquals(3, configured.probeAttempts());
+    }
+
+    @Test
+    void aShortCommandTimeoutIsNotStretchedByProbing() {
+        ModemConfig configured = ModemConfig.builder("gw-test").responseTimeoutMs(150).build();
+
+        assertEquals(150, configured.probeOnly().responseTimeoutMs());
+    }
 }
