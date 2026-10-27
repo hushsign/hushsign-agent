@@ -35,6 +35,9 @@ public final class ModemScanner {
                 log.warn("cannot open port {}, skipping", portName, e);
                 continue;
             }
+            // NOSONAR java:S2583 - the production factory never returns null, but
+            // SerialPortFactory is a seam and the test fake maps port names to ports, so a name
+            // from listPorts() can be missing. Dropping the branch would turn that into an NPE.
             if (port == null) {
                 log.warn("port factory returned null for {}, skipping", portName);
                 continue;
