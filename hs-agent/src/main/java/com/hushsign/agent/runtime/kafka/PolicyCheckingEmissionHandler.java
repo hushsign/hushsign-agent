@@ -1,5 +1,7 @@
 package com.hushsign.agent.runtime.kafka;
 
+import com.hushsign.agent.runtime.audit.AuditLog;
+import com.hushsign.agent.runtime.audit.NoopAuditLog;
 import com.hushsign.agent.runtime.policy.PolicyDecision;
 import com.hushsign.agent.runtime.policy.PolicyProvider;
 import com.hushsign.agent.runtime.transmission.TransmissionRecorder;
@@ -29,14 +31,22 @@ public final class PolicyCheckingEmissionHandler implements EmissionHandler {
     private final PolicyProvider policy;
     private final EmissionHandler delegate;
     private final TransmissionRecorder recorder;
+    private final AuditLog audit;
     private final Clock clock;
     private final AtomicLong policyRejections = new AtomicLong();
 
+    /** Without an audit log the gate still works; the runtime always passes one (P7-S2). */
     public PolicyCheckingEmissionHandler(PolicyProvider policy, EmissionHandler delegate,
                                          TransmissionRecorder recorder, Clock clock) {
+        this(policy, delegate, recorder, NoopAuditLog.INSTANCE, clock);
+    }
+
+    public PolicyCheckingEmissionHandler(PolicyProvider policy, EmissionHandler delegate,
+                                         TransmissionRecorder recorder, AuditLog audit, Clock clock) {
         this.policy = Objects.requireNonNull(policy, "policy");
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.recorder = Objects.requireNonNull(recorder, "recorder");
+        this.audit = Objects.requireNonNull(audit, "audit");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -44,11 +54,13 @@ public final class PolicyCheckingEmissionHandler implements EmissionHandler {
     public void onCommand(EmissionCommand command) throws Exception {
         PolicyDecision decision = decisionFor(command);
         if (decision.allowed()) {
+            audit.record("POLICY_ALLOW", command.emissionId(), decision.reason());
             delegate.onCommand(command);
             return;
         }
         policyRejections.incrementAndGet();
         LOG.warn("policy rejected emission {}: {}", command.emissionId(), decision.reason());
+        audit.record("POLICY_REJECT", command.emissionId(), decision.reason());
         recorder.record(command, "BLOCKED_BY_POLICY", decision.reason(), Instant.now(clock));
     }
 

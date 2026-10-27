@@ -15,6 +15,7 @@ import com.hushsign.agent.runtime.kafka.EmissionConsumer;
 import com.hushsign.agent.runtime.kafka.EmissionHandler;
 import com.hushsign.agent.runtime.kafka.KafkaSpoolSender;
 import com.hushsign.agent.runtime.kafka.PolicyCheckingEmissionHandler;
+import com.hushsign.agent.runtime.audit.FileAuditChain;
 import com.hushsign.agent.runtime.policy.engine.HourlyCounter;
 import com.hushsign.agent.runtime.policy.engine.PolicyEngine;
 import com.hushsign.agent.runtime.policy.engine.PolicySettings;
@@ -132,11 +133,16 @@ public final class AgentRuntime implements AutoCloseable {
                 policySettings.caps().perOperatorPerHour(), policySettings.caps().perGatewayPerHour(),
                 policySettings.quietHours());
 
+        // P7-S2: the audit chain lives next to the spool and is verified by the same code the
+        // offline CLI uses, so what the device claims and what the tool says cannot drift.
+        FileAuditChain audit = FileAuditChain.open(workDir.resolve("audit"), config.gatewayId(), 0, clock);
+        audit.record("STARTUP", null, "agent version " + agentVersion + ", operators " + config.operators());
+
         EmissionHandler chain = new DedupingEmissionHandler(dedupe,
                 new CancellingEmissionHandler(cancels,
                         new PolicyCheckingEmissionHandler(policy,
                                 new EmissionExecutor(modem::sendPdu, transmissions),
-                                transmissions, clock),
+                                transmissions, audit, clock),
                         transmissions, clock));
 
         List<EmissionConsumer> consumers = new ArrayList<>();
