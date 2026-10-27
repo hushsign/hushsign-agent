@@ -118,9 +118,16 @@ public record AdminSettings(InetAddress bindAddress, int port, String token, Pat
         return generated;
     }
 
+    /**
+     * Seeded once for the process: a fresh {@code SecureRandom} per token re-seeds from the
+     * platform entropy source every time, which is waste at best and a block at worst
+     * (java:S2119).
+     */
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     static String generateToken() {
         byte[] bytes = new byte[TOKEN_BYTES];
-        new SecureRandom().nextBytes(bytes);
+        RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 

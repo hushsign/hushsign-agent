@@ -2,6 +2,7 @@ package com.hushsign.agent.runtime.kafka;
 
 import com.hushsign.agent.config.AgentConfig;
 
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 
@@ -51,6 +52,12 @@ public final class KafkaClientSettings {
         }
         props.put("security.protocol", protocol);
 
+        if (protocol.startsWith("SASL") || protocol.endsWith("SSL")) {
+            // A security block is only optional while the protocol stays PLAINTEXT; once it does
+            // not, the settings below cannot be read from a null config. Stated here instead of
+            // relying on the reader to follow the ternary above (java:S2259).
+            Objects.requireNonNull(security, "kafka.security is required for " + protocol);
+        }
         if (protocol.startsWith("SASL")) {
             String mechanism = requireText(security.saslMechanism(), "kafka.security.saslMechanism");
             String username = requireText(security.saslUsername(), "kafka.security.saslUsername");

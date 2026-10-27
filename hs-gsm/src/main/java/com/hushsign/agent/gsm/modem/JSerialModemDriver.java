@@ -20,7 +20,12 @@ public final class JSerialModemDriver extends AbstractModemDriver {
 
     private final SerialPort port;
     private final ModemConfig config;
-    private PollReader pollReader;
+    /**
+     * Named {@code reader}, not {@code pollReader}: {@code AbstractModemDriver} already declares
+     * a field of that name (unused upstream), and a field that hides another is the kind of thing
+     * that turns into "why is the other one still null" six months later (java:S2387).
+     */
+    private PollReader reader;
 
     public JSerialModemDriver(SerialPort port, ModemConfig config, ModemContext modem) {
         super(modem);
@@ -38,15 +43,15 @@ public final class JSerialModemDriver extends AbstractModemDriver {
         setIn(new SerialPortInputStream(port));
         setOut(new SerialPortOutputStream(port));
 
-        pollReader = new PollReader();
-        pollReader.setName("hs-gsm-poll-" + port.name());
-        pollReader.start();
+        reader = new PollReader();
+        reader.setName("hs-gsm-poll-" + port.name());
+        reader.start();
     }
 
     @Override
     public void closePort() throws IOException {
-        if (pollReader != null) {
-            pollReader.cancel();
+        if (reader != null) {
+            reader.cancel();
         }
         port.close();
     }

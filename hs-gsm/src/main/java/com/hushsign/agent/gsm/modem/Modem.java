@@ -71,6 +71,12 @@ public final class Modem implements ModemContext, AutoCloseable {
             }
             deviceInformation.setSerialNo(serial.getResponseData().trim());
         } catch (IOException | TimeoutException | NumberFormatException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                // Restore the flag before wrapping: a shutdown that interrupts the probe must
+                // still leave the thread marked, or the caller's next blocking call ignores it
+                // (java:S2142).
+                Thread.currentThread().interrupt();
+            }
             closeQuietly();
             throw new ModemException("AT+CGSN probe failed on " + port.name(), e);
         }
