@@ -33,7 +33,50 @@ public record GatewayHeartbeat(
         List<SimInfo> sims,
         Map<String, Long> counters,
         String bootId,
-        List<String> supportedTechniques) {
+        List<String> supportedTechniques,
+        // Absent, not null: the schema types policy as an object, and Jackson would write
+        // "policy": null from an agent that predates the field - the same defect B29 was.
+        @JsonInclude(JsonInclude.Include.NON_NULL) PolicyInfo policy) {
+
+    /**
+     * The rules the agent is enforcing right now (P7-S13).
+     *
+     * <p>{@code policyHash} only says the file changed; this says what it now says. Without it
+     * a console can report "the device refused: 6-per-hour cap" but cannot answer the next
+     * question - is it still six? - because the number lives in a file on the device.
+     *
+     * <p>{@code source} is the honest part: REMOTE means the platform changed something and the
+     * value is an overlay on the file, LOCAL means the file is the whole story.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record PolicyInfo(
+            boolean killSwitch,
+            Caps caps,
+            List<String> techniques,
+            List<String> operators,
+            QuietHours quietHours,
+            Long maxCommandAgeSeconds,
+            String source,
+            List<String> remoteAllowed) {
+
+        public static final class Source {
+            public static final String LOCAL = "LOCAL";
+            public static final String REMOTE = "REMOTE";
+
+            private Source() {
+            }
+        }
+
+        /** Hourly ceilings; 0 means no ceiling. */
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public record Caps(int perTargetPerHour, int perOperatorPerHour, int perGatewayPerHour) {
+        }
+
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public record QuietHours(String start, String end, String zone) {
+        }
+    }
 
     /**
      * One modem attached to the gateway.

@@ -22,6 +22,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -43,6 +44,7 @@ class HeartbeatProducerTest {
     private Map<String, Long> counters;
     private List<GatewayHeartbeat.ModemInfo> modems;
     private List<GatewayHeartbeat.SimInfo> sims;
+    private GatewayHeartbeat.PolicyInfo policy;
     private HeartbeatProducer producer;
 
     @BeforeEach
@@ -57,6 +59,15 @@ class HeartbeatProducerTest {
                 "89abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567",
                 "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
                 "226-10", "primary", true, "SIMCOM-7600E-0001", "+40722••••22"));
+        policy = new GatewayHeartbeat.PolicyInfo(
+                false,
+                new GatewayHeartbeat.PolicyInfo.Caps(6, 120, 300),
+                List.of("SILENT_TP0", "MWI_DEACTIVATE"),
+                List.of("226-10"),
+                new GatewayHeartbeat.PolicyInfo.QuietHours("23:00", "06:00", "Europe/Bucharest"),
+                120L,
+                GatewayHeartbeat.PolicyInfo.Source.LOCAL,
+                List.of());
         producer = new HeartbeatProducer(source(), spool, CLOCK);
     }
 
@@ -101,7 +112,28 @@ class HeartbeatProducerTest {
             public Map<String, Long> counters() {
                 return counters;
             }
+
+            @Override
+            public GatewayHeartbeat.PolicyInfo policy() {
+                return policy;
+            }
         };
+    }
+
+    @Test
+    void aHeartbeatSaysWhichRulesAreInForceNotJustThatTheFileChanged() {
+        // policyHash answers "did the file change"; the console needs "is the cap still six".
+        GatewayHeartbeat heartbeat = producer.pulse();
+
+        assertNotNull(heartbeat.policy(), "the policy block is the answer to a refusal's next question");
+        assertEquals(6, heartbeat.policy().caps().perTargetPerHour());
+        assertEquals(120, heartbeat.policy().caps().perOperatorPerHour());
+        assertEquals(List.of("226-10"), heartbeat.policy().operators());
+        assertTrue(heartbeat.policy().techniques().contains("SILENT_TP0"));
+        assertEquals("23:00", heartbeat.policy().quietHours().start());
+        assertEquals("Europe/Bucharest", heartbeat.policy().quietHours().zone());
+        assertEquals(120L, heartbeat.policy().maxCommandAgeSeconds());
+        assertEquals(GatewayHeartbeat.PolicyInfo.Source.LOCAL, heartbeat.policy().source());
     }
 
     @Test

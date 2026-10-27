@@ -100,6 +100,7 @@ public final class HeartbeatProducer {
                 source.sims(),
                 source.counters(),
                 bootId,
-                supportedTechniques);
+                supportedTechniques,
+                source.policy());
     }
 }

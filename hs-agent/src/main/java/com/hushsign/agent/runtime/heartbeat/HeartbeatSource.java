@@ -33,4 +33,10 @@ public interface HeartbeatSource {
 
     /** Non-negative counters (transmissions, rejections, expiries, ...). */
     Map<String, Long> counters();
+
+    /**
+     * The rules in force, or {@code null} when the source cannot describe them (P7-S13).
+     * A hash says the file changed; this says what it now says.
+     */
+    GatewayHeartbeat.PolicyInfo policy();
 }

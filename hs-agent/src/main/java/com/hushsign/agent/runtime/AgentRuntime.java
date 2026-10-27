@@ -520,6 +520,31 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
             return configHash;
         }
 
+        /**
+         * The rules in force (P7-S13), read from the engine rather than from the file that was
+         * loaded at start: a reload or a remote change must show up in the next heartbeat, not
+         * after a restart.
+         */
+        @Override
+        public GatewayHeartbeat.PolicyInfo policy() {
+            PolicySettings inForce = policy.settings();
+            PolicySettings.QuietHours quiet = inForce.quietHours();
+            return new GatewayHeartbeat.PolicyInfo(
+                    inForce.killSwitch(),
+                    new GatewayHeartbeat.PolicyInfo.Caps(
+                            inForce.caps().perTargetPerHour(),
+                            inForce.caps().perOperatorPerHour(),
+                            inForce.caps().perGatewayPerHour()),
+                    List.copyOf(inForce.allowedTechniques()),
+                    List.copyOf(inForce.allowedOperators()),
+                    quiet == null ? null
+                            : new GatewayHeartbeat.PolicyInfo.QuietHours(
+                                    quiet.start().toString(), quiet.end().toString(), quiet.zone().getId()),
+                    inForce.maxCommandAge() == null ? null : inForce.maxCommandAge().toSeconds(),
+                    GatewayHeartbeat.PolicyInfo.Source.LOCAL,
+                    List.of());
+        }
+
         @Override
         public Long uptimeSeconds() {
             return Duration.between(startedAt, Instant.now()).toSeconds();
