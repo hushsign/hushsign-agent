@@ -1,0 +1,110 @@
+name: release
+
+# P7-S6. Runs on a tag, not on every push: this is the artefact an operator installs and a
+# procurement reviewer inspects, not a build check.
+#
+# What it produces, and what each file answers:
+#
+#   hs-agent-sbom.json          "are we affected by CVE-x in library y?" - a grep, offline
+#   *.sigstore.json             "did this binary come from this repository?" - keyless, no key
+#   attestation (GitHub)        "was it built by this workflow, from this commit?" - OIDC
+#
+# Signing is keyless on purpose. A cosign key pair means a private key to hold, back up and
+# rotate; Sigstore's OIDC flow binds the signature to the workflow identity instead, and the
+# transparency log makes it verifiable by someone who does not trust us. There is no secret to
+# configure here beyond the default GITHUB_TOKEN, and id-token: write is what enables it.
+#
+# NOT VERIFIED BY THE AUTHOR: this file has never executed. It is written against the current
+# action majors and cannot be dry-run without pushing a tag, so treat the first tagged release
+# as its test. Everything above the "sign" step (build, test, SBOM) is exercised by ci.yml on
+# every push.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build, test and generate the SBOM
+        run: ./mvnw -B verify --no-transfer-progress
+
+      - name: The SBOM must exist and describe the distribution
+        run: |
+          set -euo pipefail
+          test -s target/hs-agent-sbom.json || { echo "no SBOM was produced by the build"; exit 1; }
+          python3 - <<'PY'
+          import json
+          bom = json.load(open("target/hs-agent-sbom.json"))
+          components = bom.get("components", [])
+          print(f"{bom['bomFormat']} {bom['specVersion']}: {len(components)} components")
+          for name in ("kafka-clients", "jackson-databind", "jSerialComm"):
+              if not any(name in c["name"] for c in components):
+                  raise SystemExit(f"{name} is missing from the SBOM")
+          PY
+
+      - name: Rename the SBOM for the release
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          cp target/hs-agent-sbom.json release/hs-agent-sbom.json
+          for jar in */target/*.jar; do
+            case "$jar" in *.sources.jar|*.javadoc.jar) continue;; esac
+            cp "$jar" release/
+          done
+          (cd release && sha256sum ./* > SHA256SUMS)
+          ls -l release
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign every artefact keylessly
+        run: |
+          set -euo pipefail
+          for file in release/*; do
+            case "$file" in *.sigstore.json) continue;; esac
+            cosign sign-blob --yes "$file" --bundle "$file.sigstore.json"
+          done
+
+      - name: Attest provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'release/*'
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          body: |
+            Built from ${{ github.sha }} by the `release` workflow.
+
+            - `hs-agent-sbom.json` â€” CycloneDX inventory of everything in the distribution.
+            - `*.sigstore.json` â€” keyless signature, verifiable offline against this workflow
+              identity:
+
+              ```
+              cosign verify-blob hs-agent-sbom.json \
+                --bundle hs-agent-sbom.json.sigstore.json \
+                --certificate-identity-regexp '^https://github.com/hushsign/hushsign-agent/' \
+                --certificate-oidc-issuer https://token.actions.githubusercontent.com
+              ```
+
+            - `SHA256SUMS` â€” for a check that needs no tooling at all.
