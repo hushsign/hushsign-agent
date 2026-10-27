@@ -150,7 +150,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         // P7-S1: the policy is loaded from disk before any consumer starts, and a missing or
         // invalid file stops the agent. An agent that cannot say what it is allowed to send is
         // an agent that must not send.
-        Path policyFile = workDir.resolve(config.policy().path()).normalize();
+        Path policyFile = resolvePolicyFile(config, configFile, workDir);
         PolicySettings policySettings = PolicySettingsLoader.load(policyFile);
         // P7-S4: pause and kill are runtime flags the admin API flips; the engine consults them
         // before the file's own kill switch, so an operator acting now outranks the config.
@@ -182,7 +182,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         CancellationConsumer cancellationConsumer =
                 new CancellationConsumer(config.kafka(), config.gatewayId(), cancels);
 
-        HeartbeatSource source = new RuntimeHeartbeatSource(config, configFile, modem, consumers,
+        HeartbeatSource source = new RuntimeHeartbeatSource(config, configFile, policyFile, modem, consumers,
                 Instant.now(), agentVersion);
         HeartbeatProducer heartbeat = new HeartbeatProducer(source, spool);
 
@@ -429,6 +429,37 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         }
     }
 
+    /**
+     * Finds the policy file (P7-S7).
+     *
+     * <p>The installed layout keeps {@code agent.yaml} and {@code policy.yaml} together in
+     * {@code /etc/hs-agent} while the work directory is {@code /var/lib/hs-agent}, so a relative
+     * {@code policy.path} has to be looked for next to the configuration first. Resolving it only
+     * against the work directory made every installed gateway fail to start with "policy file not
+     * found", which is precisely what the first deployment on a real host did.
+     *
+     * <p>A developer run keeps both in the work directory, which is why that is the fallback.
+     */
+    static Path resolvePolicyFile(AgentConfig config, Path configFile, Path workDir) {
+        Path configured = Path.of(config.policy().path());
+        if (configured.isAbsolute()) {
+            return configured.normalize();
+        }
+        Path besideConfig = null;
+        if (configFile != null && configFile.toAbsolutePath().getParent() != null) {
+            besideConfig = configFile.toAbsolutePath().getParent().resolve(configured).normalize();
+            if (Files.isRegularFile(besideConfig)) {
+                return besideConfig;
+            }
+        }
+        Path underWorkDir = workDir.resolve(configured).normalize();
+        if (Files.isRegularFile(underWorkDir) || besideConfig == null) {
+            return underWorkDir;
+        }
+        // Neither exists: name the place an operator is most likely to have meant.
+        return besideConfig;
+    }
+
     private static String serialOf(Modem modem) {
         String serial = modem.getDeviceInformation() == null
                 ? null : modem.getDeviceInformation().getSerialNo();
@@ -455,7 +486,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         private final String policyHash;
         private final String configHash;
 
-        RuntimeHeartbeatSource(AgentConfig config, Path configFile, Modem modem,
+        RuntimeHeartbeatSource(AgentConfig config, Path configFile, Path policyFile, Modem modem,
                                List<EmissionConsumer> consumers, Instant startedAt,
                                String agentVersion) {
             this.config = config;
@@ -465,7 +496,8 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
             this.startedAt = startedAt;
             this.agentVersion = agentVersion;
             this.configHash = hashOfFile(configFile, config.toString());
-            this.policyHash = hashOfFile(Path.of(config.workDir()).resolve(config.policy().path()), "");
+            // The hash must cover the file the agent actually enforces, not a path guess.
+            this.policyHash = hashOfFile(policyFile, "");
         }
 
         @Override
