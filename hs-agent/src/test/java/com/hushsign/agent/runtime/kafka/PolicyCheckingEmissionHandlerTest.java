@@ -96,8 +96,26 @@ class PolicyCheckingEmissionHandlerTest {
     }
 
     @Test
-    void providerFailureFailsClosed() throws Exception {
+    void theReasonThatLeavesTheDeviceCarriesNoTargetNumber() throws Exception {
+        // The cap reason names the number that hit the ceiling. It may say so in the local
+        // chain, but hs.transmissions.v1 is not allowed to carry a target number, and scrubbing
+        // it later on the platform is too late: by then it is in the topic's segments.
         RecordingHandler delegate = new RecordingHandler();
+        RecordingRecorder recorder = new RecordingRecorder();
+        PolicyCheckingEmissionHandler handler = new PolicyCheckingEmissionHandler(
+                cmd -> PolicyDecision.reject("target " + cmd.msisdn() + " has reached its 6-per-hour cap"),
+                delegate, recorder, CLOCK);
+
+        handler.onCommand(command("5c9f7a2e-66f1-4b1f-9e7f-1f2a3b4c5d6e"));
+
+        String cause = recorder.causes.get(0);
+        assertTrue(cause.contains("*"), "the number must be masked: " + cause);
+        assertTrue(cause.endsWith("has reached its 6-per-hour cap"), cause);
+        assertTrue(cause.indexOf("722111222") < 0, "the raw number must not leave the gateway: " + cause);
+    }
+
+    @Test
+    void providerFailureFailsClosed() throws Exception {        RecordingHandler delegate = new RecordingHandler();
         RecordingRecorder recorder = new RecordingRecorder();
         PolicyProvider throwing = cmd -> {
             throw new IllegalStateException("policy file unreadable");

@@ -4,6 +4,7 @@ import com.hushsign.agent.runtime.audit.AuditLog;
 import com.hushsign.agent.runtime.audit.NoopAuditLog;
 import com.hushsign.agent.runtime.policy.PolicyDecision;
 import com.hushsign.agent.runtime.policy.PolicyProvider;
+import com.hushsign.agent.runtime.sensitive.SensitiveRedactor;
 import com.hushsign.agent.runtime.transmission.TransmissionRecorder;
 import com.hushsign.protocol.v1.EmissionCommand;
 import org.slf4j.Logger;
@@ -60,8 +61,13 @@ public final class PolicyCheckingEmissionHandler implements EmissionHandler {
         }
         policyRejections.incrementAndGet();
         LOG.warn("policy rejected emission {}: {}", command.emissionId(), decision.reason());
+        // The chain on this device may know why in full; the message that leaves for the platform
+        // may not. The cap reason names the target number, and SECURITY.md promises that
+        // hs.transmissions.v1 carries no target number - so scrub before recording, not later
+        // when the platform projects it.
         audit.record("POLICY_REJECT", command.emissionId(), decision.reason());
-        recorder.record(command, "BLOCKED_BY_POLICY", decision.reason(), Instant.now(clock));
+        recorder.record(command, "BLOCKED_BY_POLICY", SensitiveRedactor.scrub(decision.reason()),
+                Instant.now(clock));
     }
 
     @Override
