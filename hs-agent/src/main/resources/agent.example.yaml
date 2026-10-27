@@ -19,11 +19,21 @@ kafka:
     # truststorePassword: set HS_KAFKA_SECURITY_TRUSTSTORE_PASSWORD (only for SSL/SASL_SSL)
 
 modems:
-  # Pin the port on a real gateway: a Huawei-class dongle exposes three ttyUSB interfaces and
-  # only one answers AT, so scanning spends time on the other two at every start. Leave
-  # autoScan true only while bringing a host up and finding out which port is the AT one.
+  # Pin the port on a real gateway. A Huawei-class dongle exposes three ttyUSB interfaces and
+  # only one answers AT, so scanning wastes time on the others at every start.
+  #
+  # Use the by-id link, not /dev/ttyUSB0. A dongle that resets - a brown-out during transmit is
+  # common on a shared or switched USB port - comes back with a different ttyUSB number, and a
+  # pinned /dev/ttyUSB0 then points at the wrong interface or at nothing:
+  #
+  #   ls -l /dev/serial/by-id/
+  #     usb-HUAWEI_Technology_HUAWEI_Mobile-if00-port0 -> ../../ttyUSB1
+  #
   #   autoScan: false
-  #   ports: ["/dev/ttyUSB0"]
+  #   ports: ["/dev/serial/by-id/usb-HUAWEI_Technology_HUAWEI_Mobile-if00-port0"]
+  #
+  # Leave autoScan true only while bringing a host up and finding out which interface is the AT
+  # one; it is a convenience, not a deployment setting.
   autoScan: true
   ports: []                    # when autoScan is false: device paths
   baudRate: 115200

@@ -64,7 +64,9 @@ Installed. Nothing has been started yet, deliberately.
   1. Put the gateway uuid the fleet registry assigned into $CONFIG_DIR/agent.yaml
      (gatewayId). A name that is not a uuid is refused at startup.
   2. Review $CONFIG_DIR/policy.yaml - techniques, operators, caps, quiet hours.
-  3. Check the modem is visible:  ls -l /dev/ttyUSB*
+  3. Check the modem is visible:  ls -l /dev/ttyUSB* /dev/serial/by-id/
+     Pin the by-id path in agent.yaml (modems.ports): a dongle that resets comes back with a
+     different ttyUSB number, and a pinned /dev/ttyUSB0 then points at nothing.
   4. Start it:                    systemctl enable --now hs-agent
   5. Watch it:                    journalctl -u hs-agent -f
   6. Talk to it:                  $PREFIX/bin/hs-agent ctl status

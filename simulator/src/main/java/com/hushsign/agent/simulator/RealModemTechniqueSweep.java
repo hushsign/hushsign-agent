@@ -6,7 +6,6 @@ import com.hushsign.agent.gsm.modem.ModemException;
 import com.hushsign.agent.gsm.modem.PduSubmission;
 import com.hushsign.agent.gsm.serial.JSerialCommPortFactory;
 import com.hushsign.agent.technique.Technique;
-import com.hushsign.agent.technique.TechniqueParams;
 
 /**
  * P1-S14 field sweep: sends EVERY catalog technique through a real modem to
@@ -40,7 +39,7 @@ public final class RealModemTechniqueSweep {
             System.out.println("modem open on " + port + ", state=" + modem.state());
             int sent = 0;
             for (Technique technique : Technique.values()) {
-                String pdu = technique.generate(destination, TechniqueParams.None.INSTANCE);
+                String pdu = technique.generate(destination, technique.defaultParams());
                 int index = modem.sendPdu(pdu);
                 System.out.println(technique + " PDU (" + pdu.length() / 2 + " octets): "
                         + pdu + " -> index=" + index);

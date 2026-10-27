@@ -28,6 +28,17 @@ Requirements
   * a modem on /dev/ttyUSB* and membership of the dialout group
   * reachability to the Kafka brokers in agent.yaml
 
+Pin the modem by its stable path, not by number:
+
+  ls -l /dev/serial/by-id/
+    usb-HUAWEI_Technology_HUAWEI_Mobile-if00-port0 -> ../../ttyUSB1
+
+A dongle that resets comes back with a different ttyUSB number, so a pin of
+/dev/ttyUSB0 can silently point at the wrong interface (or at nothing) after a
+brown-out. This really happens: during the first field test the modem dropped
+off the bus mid-transmit on a switched USB port and re-enumerated as
+/dev/ttyUSB1.
+
 Files it writes
 ---------------
 
@@ -48,9 +59,11 @@ Verifying the device
   hs-agent ctl kill                refuse everything until the service is restarted
   hs-agent ctl policy reload       re-read policy.yaml
 
-The audit chain can also be verified offline, without the agent running:
+The audit chain can also be verified offline, without the agent running. Note `--dir`, which the
+first version of this file omitted:
 
-  java -cp 'lib/*' com.hushsign.agent.audit.AuditCli verify /var/lib/hs-agent/audit
-  java -cp 'lib/*' com.hushsign.agent.audit.AuditCli export /var/lib/hs-agent/audit > audit.txt
+  java -cp 'lib/*' com.hushsign.agent.audit.AuditCli verify --dir /var/lib/hs-agent/audit
+  java -cp 'lib/*' com.hushsign.agent.audit.AuditCli tail   --dir /var/lib/hs-agent/audit --count 20
+  java -cp 'lib/*' com.hushsign.agent.audit.AuditCli export --dir /var/lib/hs-agent/audit --out /tmp/audit.txt
 
 The process exits non-zero when the chain does not hold, so it can gate a script.
