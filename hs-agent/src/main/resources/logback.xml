@@ -10,7 +10,10 @@
     cannot appear in it.
   * agent.log - the operator's own copy, with the raw values, what someone
     reads when they need to know which target hit a cap. Stays on the device,
-    owner-only, and rolls off quickly.
+    owner-only, and rolls off quickly. Off unless asked for:
+    HS_AGENT_LOG_IDENTIFIERS=raw (default "masked"). A scrubbed copy of a
+    scrubbed log would be a second file that tells nobody anything, so the
+    choice is explicit instead of accidental - see IdentifierLogging.
 
   The console feeds the journal, which is routinely collected, so it gets the
   scrubbed encoder too.
@@ -47,6 +50,7 @@
       <maxHistory>3</maxHistory>
       <totalSizeCap>100MB</totalSizeCap>
     </rollingPolicy>
+    <filter class="com.hushsign.agent.runtime.sensitive.IdentifierLoggingFilter"/>
     <encoder>
       <pattern>${PATTERN}</pattern>
     </encoder>

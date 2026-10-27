@@ -2,6 +2,13 @@
 # environment variable (HS_ + underscored path): HS_GATEWAY_ID,
 # HS_KAFKA_BOOTSTRAP_SERVERS, HS_MODEMS_PORTS, HS_DEDUPE_MAX_ENTRIES, ...
 # Secrets (SASL password) must come from the environment, never from this file.
+#
+# Logging identifiers: the agent writes agent-clean.log (scrubbed) and, only when asked,
+# agent.log with raw IMSI / MSISDN / ICCID. That is an environment setting rather than a key
+# here, because logging starts before this file is read:
+#
+#   HS_AGENT_LOG_IDENTIFIERS=masked   default; agent.log is not written at all
+#   HS_AGENT_LOG_IDENTIFIERS=raw      agent.log carries raw identities (owner-only file)
 
 gatewayId: 4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11   # the uuid the fleet registry assigned to this gateway
 operators: ["226-10"]

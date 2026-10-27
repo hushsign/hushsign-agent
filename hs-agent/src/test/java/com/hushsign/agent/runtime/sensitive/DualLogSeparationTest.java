@@ -1,6 +1,8 @@
 package com.hushsign.agent.runtime.sensitive;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -67,6 +69,45 @@ class DualLogSeparationTest {
                 "no 11-20 digit run may survive in a log that leaves the device: " + clean);
     }
 
+    @Test
+    void byDefaultTheRawLogIsNotWrittenAtAll() throws Exception {
+        Path dir = Files.createTempDirectory("hs-masked-log");
+
+        runThroughTheShippedConfig(dir, IdentifierLogging.MASKED, logger -> {
+            logger.info("modem claimed: serial={} imsi={}", "ABC123", IMSI);
+            logger.warn("policy rejected emission e-1: target {} has reached its 6-per-hour cap", MSISDN);
+        });
+
+        String clean = Files.readString(dir.resolve("agent-clean.log"), StandardCharsets.UTF_8);
+        Path raw = dir.resolve("agent.log");
+        String full = Files.exists(raw) ? Files.readString(raw, StandardCharsets.UTF_8) : "";
+
+        assertEquals("", full, "masked means agent.log is not written, not merely scrubbed");
+        assertTrue(clean.contains("31015**********"), "the clean log still carries the correlatable mask");
+        assertFalse(SensitiveRedactor.containsIdentity(clean), "and no identity: " + clean);
+    }
+
+    @Test
+    void anUnreadableSettingFailsInsteadOfFallingBackSilently() {
+        String previous = System.getProperty(IdentifierLogging.ENV);
+        System.setProperty(IdentifierLogging.ENV, "RAW");   // a typo an operator will make
+        try {
+            assertEquals(IdentifierLogging.RAW, IdentifierLogging.configured(), "case does not matter");
+
+            System.setProperty(IdentifierLogging.ENV, "unmasked");
+            IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+                    IdentifierLogging::configured);
+            assertTrue(thrown.getMessage().contains(IdentifierLogging.ENV), thrown.getMessage());
+            assertFalse(IdentifierLogging.rawEnabled(), "the filter fails closed while the value is wrong");
+        } finally {
+            if (previous == null) {
+                System.clearProperty(IdentifierLogging.ENV);
+            } else {
+                System.setProperty(IdentifierLogging.ENV, previous);
+            }
+        }
+    }
+
     private interface LogWork {
         void log(Logger logger);
     }
@@ -80,9 +121,20 @@ class DualLogSeparationTest {
      * except a quiet logger.
      */
     private void runThroughTheShippedConfig(Path dir, LogWork work) throws Exception {
+        runThroughTheShippedConfig(dir, IdentifierLogging.RAW, work);
+    }
+
+    /**
+     * @param identifiers {@link IdentifierLogging#RAW} or {@link IdentifierLogging#MASKED} -
+     *                    P7-S12 made the raw file opt-in, so a test that expects raw values in
+     *                    {@code agent.log} has to ask for them the way an operator would
+     */
+    private void runThroughTheShippedConfig(Path dir, String identifiers, LogWork work) throws Exception {
         LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
         String previous = System.getProperty("HS_LOG_DIR");
+        String previousIdentifiers = System.getProperty(IdentifierLogging.ENV);
         System.setProperty("HS_LOG_DIR", dir.toString());
+        System.setProperty(IdentifierLogging.ENV, identifiers);
         try {
             context.reset();
             JoranConfigurator configurator = new JoranConfigurator();
@@ -98,6 +150,11 @@ class DualLogSeparationTest {
                 System.clearProperty("HS_LOG_DIR");
             } else {
                 System.setProperty("HS_LOG_DIR", previous);
+            }
+            if (previousIdentifiers == null) {
+                System.clearProperty(IdentifierLogging.ENV);
+            } else {
+                System.setProperty(IdentifierLogging.ENV, previousIdentifiers);
             }
         }
     }

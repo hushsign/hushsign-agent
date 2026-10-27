@@ -48,7 +48,12 @@ Files it writes
   /var/lib/hs-agent/audit/         the hash-chained audit log, audit-0001.jsonl, ...
   /var/lib/hs-agent/admin.token    bearer token for the loopback admin API
   /var/log/hs-agent/agent-clean.log  scrubbed: safe to send to a vendor
-  /var/log/hs-agent/agent.log        the operator's copy, with raw values; owner-only
+  /var/log/hs-agent/agent.log        the operator's copy, with raw values; owner-only,
+                                     and empty unless you ask for it:
+                                     HS_AGENT_LOG_IDENTIFIERS=raw in /etc/hs-agent/agent.env
+                                     (default "masked"). Turn it off when the
+                                     investigation is over, and remember that this
+                                     file is the one that identifies targets.
 
 Verifying the device
 --------------------

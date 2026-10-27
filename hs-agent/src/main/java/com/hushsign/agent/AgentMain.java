@@ -14,6 +14,7 @@ import com.hushsign.agent.runtime.AgentRuntime;
 import com.hushsign.agent.runtime.admin.AdminClient;
 import com.hushsign.agent.runtime.admin.AdminServer;
 import com.hushsign.agent.runtime.admin.AdminSettings;
+import com.hushsign.agent.runtime.sensitive.IdentifierLogging;
 import com.hushsign.agent.runtime.sensitive.LogDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +67,15 @@ public final class AgentMain {
 
     private static void run(String[] args) throws Exception {
         if (!LogDirectory.harden(LogDirectory.configured())) {
-            LOG.info("log directory is not owner-only; agent.log carries raw SIM identities, so keep it on the device");
+            LOG.info("log directory is not owner-only; keep the log directory on the device");
+        }
+        boolean rawIdentifiers = rawIdentifiersEnabled();
+        if (rawIdentifiers) {
+            // Loud on purpose: somebody chose this, and the choice has to be findable in the
+            // log of the device that made it.
+            LOG.warn("{}={}: {} carries IMSI / MSISDN / ICCID in clear; keep it on the device "
+                            + "and turn it off when the investigation is over",
+                    IdentifierLogging.ENV, IdentifierLogging.RAW, LogDirectory.configured().resolve("agent.log"));
         }
         Path configFile = configPath(args);
         AgentConfig config = AgentConfigLoader.load(configFile);
@@ -78,12 +87,28 @@ public final class AgentMain {
 
         AgentRuntime runtime = AgentRuntime.start(config, configFile, modem,
                 version(AgentMain.class.getPackage().getImplementationVersion()));
+        if (rawIdentifiers) {
+            runtime.auditLog().record("STARTUP", null,
+                    "log identifiers = raw: agent.log carries subscriber identifiers in clear");
+        }
         Optional<AdminServer> adminServer = startAdminServer(config, runtime);
         try {
             runtime.awaitTermination();
         } finally {
             adminServer.ifPresent(AdminServer::close);
             runtime.close();
+        }
+    }
+
+    /**
+     * Whether raw identifiers may be logged (P7-S12), reported as a configuration error rather
+     * than a stack trace: a typo in the variable name must not be silently read as "masked".
+     */
+    private static boolean rawIdentifiersEnabled() {
+        try {
+            return IdentifierLogging.RAW.equals(IdentifierLogging.configured());
+        } catch (IllegalArgumentException e) {
+            throw new ConfigException(e.getMessage());
         }
     }
 
