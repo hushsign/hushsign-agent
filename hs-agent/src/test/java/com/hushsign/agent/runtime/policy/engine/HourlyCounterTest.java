@@ -69,4 +69,44 @@ class HourlyCounterTest {
         counter.decrement("operator:226-10");
         assertEquals(0, counter.count("operator:226-10"), "a decrement below zero is a no-op");
     }
+
+    @Test
+    void theCeilingSurvivesARestart(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) {
+        // systemd restarts this process every time the modem hiccups. A ceiling that starts
+        // again at zero on each restart is six per restart, which is not a ceiling.
+        java.nio.file.Path journal = dir.resolve("policy-counters.journal");
+        HourlyCounter before = new HourlyCounter(clock, journal);
+        before.incrementAndGet("target:+40700000001");
+        before.incrementAndGet("target:+40700000001");
+        before.incrementAndGet("target:+40700000001");
+
+        HourlyCounter afterRestart = new HourlyCounter(clock, journal);
+
+        assertEquals(3, afterRestart.count("target:+40700000001"));
+        assertEquals(4, afterRestart.incrementAndGet("target:+40700000001"));
+    }
+
+    @Test
+    void aGivenBackCountIsNotResurrectedByARestart(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) {
+        java.nio.file.Path journal = dir.resolve("policy-counters.journal");
+        HourlyCounter before = new HourlyCounter(clock, journal);
+        before.incrementAndGet("target:+40700000001");
+        before.decrement("target:+40700000001");
+
+        assertEquals(0, new HourlyCounter(clock, journal).count("target:+40700000001"));
+    }
+
+    @Test
+    void theJournalDoesNotAwardAFreshHourWhenTheClockGoesBackwards(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) {
+        java.nio.file.Path journal = dir.resolve("policy-counters.journal");
+        HourlyCounter counter = new HourlyCounter(clock, journal);
+        counter.incrementAndGet("target:+40700000001");
+        clock.now = Instant.parse("2026-10-27T09:10:00Z");
+
+        HourlyCounter rewound = new HourlyCounter(clock, journal);
+
+        assertEquals(1, rewound.count("target:+40700000001"),
+                "a backward clock jump reuses the bucket it left instead of opening a new one");
+    }
 }

@@ -156,7 +156,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         // before the file's own kill switch, so an operator acting now outranks the config.
         AdminState adminState = new AdminState();
         PolicyEngine policy = new PolicyEngine(policySettings, config.gatewayId(),
-                new HourlyCounter(clock), clock, adminState);
+                new HourlyCounter(clock, workDir.resolve("policy-counters.journal")), clock, adminState);
         LOG.info("policy loaded from {}: killSwitch={} techniques={} operators={} caps={}/{}/{} quietHours={}",
                 policySettings, policySettings.killSwitch(), policySettings.allowedTechniques(),
                 policySettings.allowedOperators(), policySettings.caps().perTargetPerHour(),
