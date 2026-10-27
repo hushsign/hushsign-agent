@@ -67,9 +67,12 @@ Installed. Nothing has been started yet, deliberately.
   3. Check the modem is visible:  ls -l /dev/ttyUSB* /dev/serial/by-id/
      Pin the by-id path in agent.yaml (modems.ports): a dongle that resets comes back with a
      different ttyUSB number, and a pinned /dev/ttyUSB0 then points at nothing.
-  4. Start it:                    systemctl enable --now hs-agent
-  5. Watch it:                    journalctl -u hs-agent -f
-  6. Talk to it:                  $PREFIX/bin/hs-agent ctl status
+  4. Huawei K3765-family modems need modems.pduSubmission: TPDU_HEX. The default FULL_HEX is
+     rejected with "+CMS ERROR: 304", which reaches the platform as
+     "modem ... rejected the PDU" - the first real send on the test VM failed exactly this way.
+  5. Start it:                    systemctl enable --now hs-agent
+  6. Watch it:                    journalctl -u hs-agent -f
+  7. Talk to it:                  $PREFIX/bin/hs-agent ctl status
 
 The admin token is generated on first start at $STATE_DIR/admin.token (0600).
 NEXT
