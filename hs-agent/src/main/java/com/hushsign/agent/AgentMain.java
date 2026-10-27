@@ -10,6 +10,7 @@ import com.hushsign.agent.gsm.modem.PduSubmission;
 import com.hushsign.agent.gsm.serial.JSerialCommPortFactory;
 import com.hushsign.agent.gsm.serial.SerialPortFactory;
 import com.hushsign.agent.runtime.AgentRuntime;
+import com.hushsign.agent.runtime.sensitive.LogDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,6 +34,9 @@ public final class AgentMain {
     }
 
     public static void main(String[] args) throws Exception {
+        if (!LogDirectory.harden(LogDirectory.configured())) {
+            LOG.info("log directory is not owner-only; agent.log carries raw SIM identities, so keep it on the device");
+        }
         Path configFile = configPath(args);
         AgentConfig config = AgentConfigLoader.load(configFile);
         LOG.info("starting agent gateway={} operators={} pduSubmission={}",

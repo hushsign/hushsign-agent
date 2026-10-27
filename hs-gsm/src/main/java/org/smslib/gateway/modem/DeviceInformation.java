@@ -137,6 +137,22 @@ public class DeviceInformation
 	@Override
 	public String toString()
 	{
-		return String.format("MANUF:%s, MODEL:%s, SERNO:%s, IMSI:%s, SW:%s, RSSI:%ddBm, MODE:%s", getManufacturer(), getModel(), getSerialNo(), getImsi(), getSwVersion(), getRssi(), getMode());
+		return String.format("MANUF:%s, MODEL:%s, SERNO:%s, IMSI:%s, SW:%s, RSSI:%ddBm, MODE:%s", getManufacturer(), getModel(), getSerialNo(), maskedImsi(), getSwVersion(), getRssi(), getMode());
+	}
+
+	/**
+	 * The IMSI as it is safe to print. The full value identifies a subscriber for
+	 * life, so it never reaches a log line through {@link #toString()}; callers
+	 * that genuinely need it ask for {@link #getImsi()} explicitly.
+	 */
+	private String maskedImsi()
+	{
+		String value = this.imsi;
+		if (value == null || value.isBlank() || "N/A".equals(value))
+		{
+			return "N/A";
+		}
+		int keep = Math.min(5, value.length());
+		return value.substring(0, keep) + "*".repeat(value.length() - keep);
 	}
 }

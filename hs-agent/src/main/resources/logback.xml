@@ -1,29 +1,54 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Agent logging. Console for the container/systemd journal, plus a size-capped
-  file under ${HS_LOG_DIR} (default ./logs) so a field gateway keeps evidence
-  even when nobody is attached to the console.
+  Agent logging (P1-S13, split in P7-S5).
+
+  Two file sinks, because they answer different questions:
+
+  * agent-clean.log - what leaves the device. Copied into a support bundle, a
+    ticket or a SIEM. Scrubbed by RedactingEncoder, so an IMSI or an MSISDN
+    written as a plain string by a caller, a policy reason or a library still
+    cannot appear in it.
+  * agent.log - the operator's own copy, with the raw values, what someone
+    reads when they need to know which target hit a cap. Stays on the device,
+    owner-only, and rolls off quickly.
+
+  The console feeds the journal, which is routinely collected, so it gets the
+  scrubbed encoder too.
 -->
 <configuration>
 
   <property name="LOG_DIR" value="${HS_LOG_DIR:-logs}"/>
+  <property name="PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"/>
 
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-    <encoder>
-      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+    <encoder class="com.hushsign.agent.runtime.sensitive.RedactingEncoder">
+      <pattern>${PATTERN}</pattern>
     </encoder>
   </appender>
 
-  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-    <file>${LOG_DIR}/agent.log</file>
+  <appender name="CLEAN" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${LOG_DIR}/agent-clean.log</file>
     <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-      <fileNamePattern>${LOG_DIR}/agent.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+      <fileNamePattern>${LOG_DIR}/agent-clean.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
       <maxFileSize>10MB</maxFileSize>
       <maxHistory>14</maxHistory>
       <totalSizeCap>200MB</totalSizeCap>
     </rollingPolicy>
+    <encoder class="com.hushsign.agent.runtime.sensitive.RedactingEncoder">
+      <pattern>${PATTERN}</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="FULL" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${LOG_DIR}/agent.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>${LOG_DIR}/agent.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+      <maxFileSize>10MB</maxFileSize>
+      <maxHistory>3</maxHistory>
+      <totalSizeCap>100MB</totalSizeCap>
+    </rollingPolicy>
     <encoder>
-      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+      <pattern>${PATTERN}</pattern>
     </encoder>
   </appender>
 
@@ -32,7 +57,8 @@
 
   <root level="INFO">
     <appender-ref ref="CONSOLE"/>
-    <appender-ref ref="FILE"/>
+    <appender-ref ref="CLEAN"/>
+    <appender-ref ref="FULL"/>
   </root>
 
 </configuration>

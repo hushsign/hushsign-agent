@@ -36,11 +36,15 @@
       <version>2.2</version>
     </dependency>
     <!-- Without a binding the production runtime logs into the void (NOP logger):
-       operators of a field gateway need send/policy/spool failures on disk. -->
+       operators of a field gateway need send/policy/spool failures on disk.
+
+       Compile scope (not runtime) since P7-S5: RedactingEncoder extends
+       logback's EncoderBase so the ship-safe log is scrubbed at the appender
+       boundary. The codebase still logs through SLF4J everywhere — this is the
+       single place that touches the binding. -->
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
-      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
