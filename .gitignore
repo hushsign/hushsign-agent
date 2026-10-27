@@ -1,6 +1,8 @@
 target/
 *.class
 *.log
+# runtime logs written next to the module when the agent or simulator is run locally
+logs/
 
 # IDE
 .idea/
