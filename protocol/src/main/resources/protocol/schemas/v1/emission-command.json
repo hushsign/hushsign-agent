@@ -27,7 +27,7 @@
     "msisdn": { "type": "string", "pattern": "^\\+?[0-9]{7,15}$" },
     "technique": {
       "type": "string",
-      "enum": ["SILENT_TP0", "WAP_PUSH_EMPTY", "WAP_PUSH_SL", "WAP_PUSH_SI", "MWI_TOGGLE", "MMS_NOTIFY_EMPTY", "MWI_DEACTIVATE"]
+      "enum": ["SILENT_TP0", "WAP_PUSH_EMPTY", "WAP_PUSH_SL", "WAP_PUSH_SI", "MWI_TOGGLE", "MMS_NOTIFY_EMPTY", "MWI_DEACTIVATE", "SMS_DELIVERY"]
     },
     "operator": { "type": "string", "pattern": "^[0-9]{3}-[0-9]{2,3}$" },
     "attempt": { "type": "integer", "minimum": 1 },

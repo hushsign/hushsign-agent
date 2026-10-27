@@ -24,8 +24,12 @@ class TechniqueWireCodeTest {
 
     @Test
     void supportedWireCodesAreTheEnumNames() {
+        // SMS_DELIVERY is absent on purpose: the heartbeat schema enumerates these codes, and a
+        // technique that ships disabled on both sides must not be advertised as supported.
         assertEquals(List.of("SILENT_TP0", "WAP_PUSH_EMPTY", "MMS_NOTIFY_EMPTY", "MWI_DEACTIVATE"),
                 Technique.supportedWireCodes());
+        assertEquals(Technique.SMS_DELIVERY, Technique.fromWireCode("SMS_DELIVERY"),
+                "it still resolves, so a command for it is answered rather than called unknown");
     }
 
     @Test

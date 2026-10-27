@@ -2,12 +2,14 @@ package com.hushsign.agent.technique;
 
 import org.ajwcc.pduUtils.gsm3040.Pdu;
 import org.ajwcc.pduUtils.gsm3040.PduParser;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -51,7 +53,9 @@ class TechniqueGoldenTest {
         assertEquals("40756270541", pdu.getAddress(), c.name() + " destination");
         assertEquals(c.technique() == Technique.SILENT_TP0 ? 0x40 : 0x00,
                 pdu.getProtocolIdentifier(), c.name() + " TP-PID");
-        boolean sevenBit = c.technique() == Technique.SILENT_TP0 || c.technique() == Technique.MWI_DEACTIVATE;
+        boolean sevenBit = c.technique() == Technique.SILENT_TP0
+                || c.technique() == Technique.MWI_DEACTIVATE
+                || c.technique() == Technique.SMS_DELIVERY;
         assertEquals(sevenBit ? 0x00 : 0x04, pdu.getDataCodingScheme(), c.name() + " TP-DCS");
     }
 
@@ -66,5 +70,31 @@ class TechniqueGoldenTest {
         assertTrue(pdu.isPortedMessage(), c.name() + " must carry a 16-bit port UDH");
         assertEquals(0x0B84, pdu.getDestPort(), c.name() + " destination port");
         assertEquals(0, pdu.getSrcPort(), c.name() + " source port");
+    }
+
+    /**
+     * P7-S9: the visible technique, checked by decoding the PDU with the vendored codec rather
+     * than against a captured hex. There is no capture — this technique has never been sent —
+     * and a hex literal written by the same hand as the encoder would only prove the encoder is
+     * consistent with itself. Decoding with an independent implementation proves the message a
+     * phone would render is the sentence we meant to send.
+     */
+    @Test
+    void theVisibleTechniqueDecodesBackToItsFixedSentence() {
+        Pdu pdu = PARSER.parsePdu(Technique.SMS_DELIVERY.generate("40756270541",
+                Technique.SMS_DELIVERY.defaultParams()));
+
+        assertEquals(Technique.SMS_DELIVERY_TEXT, pdu.getDecodedText());
+        assertEquals(Technique.SMS_DELIVERY_TEXT.length(), pdu.getUDLength(),
+                "TP-UDL counts septets for a 7-bit message, not octets");
+        assertEquals("40756270541", pdu.getAddress());
+        assertEquals(0x00, pdu.getProtocolIdentifier(), "an ordinary SMS, not a type-0 ping");
+    }
+
+    @Test
+    void theVisibleTechniqueRefusesTheSilentParameterShape() {
+        assertThrows(IllegalArgumentException.class,
+                () -> Technique.SMS_DELIVERY.generate("40756270541", TechniqueParams.None.INSTANCE),
+                "asking for text-encoded user data with the empty shape would produce an empty SMS");
     }
 }

@@ -68,7 +68,7 @@ public final class EmissionExecutor implements EmissionHandler {
 
         String pdu;
         try {
-            pdu = technique.generate(digitsOf(command.msisdn()), TechniqueParams.None.INSTANCE);
+            pdu = technique.generate(digitsOf(command.msisdn()), technique.defaultParams());
         } catch (IllegalArgumentException e) {
             report(command, TransmissionResult.Outcome.FAILED, "cannot build PDU: " + e.getMessage(),
                     null, requestedAt, false);

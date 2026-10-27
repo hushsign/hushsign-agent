@@ -3,6 +3,7 @@ package com.hushsign.agent.runtime.policy.engine;
 import com.hushsign.agent.runtime.policy.PolicyDecision;
 import com.hushsign.agent.runtime.policy.PolicyProvider;
 import com.hushsign.agent.runtime.policy.RuntimeState;
+import com.hushsign.agent.technique.Technique;
 import com.hushsign.protocol.v1.EmissionCommand;
 import java.time.Clock;
 import java.time.Duration;
@@ -99,6 +100,11 @@ public final class PolicyEngine implements PolicyProvider {
         }
         if (!settings.allowedTechniques().isEmpty() && !settings.allowedTechniques().contains(command.technique())) {
             return PolicyDecision.reject("technique " + command.technique() + " is not in the allow list");
+        }
+        if (Technique.SMS_DELIVERY.wireCode().equals(command.technique()) && !settings.visibleSmsAllowed()) {
+            // Two keys, deliberately. A catalogue paste that happens to include SMS_DELIVERY
+            // must not be enough to switch on visible messaging.
+            return PolicyDecision.reject("visible SMS is not enabled (visibleSms: true in policy.yaml)");
         }
         if (isBlank(command.msisdn())) {
             return PolicyDecision.reject("command names no target number");

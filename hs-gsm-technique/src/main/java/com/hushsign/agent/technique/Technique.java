@@ -38,7 +38,24 @@ public enum Technique {
      * produces a visible notification on modern phones.
      */
     MWI_DEACTIVATE("mwi_deactivate", "MWI deactivation (voicemail icon clear)", 0x61, 0x00, 0x00,
-            "040102000000");
+            "040102000000"),
+
+    /**
+     * A normal, visible SMS carrying one fixed sentence (P7-S9).
+     *
+     * <p>This is the only technique in the catalogue that a person can see, and it exists for
+     * one purpose: a field test that proves the whole path — platform, broker, agent, modem,
+     * network — with something observable, rather than inferring success from a silent SMS that
+     * nothing acknowledges. It is not a messaging feature. The text comes from
+     * {@link #SMS_DELIVERY_TEXT} and nowhere else, because {@code EmissionCommand} has no field
+     * to carry a body, so this technique cannot become a channel for arbitrary text.
+     *
+     * <p>Shipped disabled in both places that can permit it: the platform's technique catalogue
+     * row is {@code enabled = FALSE} and the agent's policy allow list omits it. Both have to be
+     * changed, deliberately, on both sides.
+     */
+    SMS_DELIVERY("sms_delivery", "Visible test SMS with a fixed body (field test only)", 0x01, 0x00, 0x00,
+            "");
 
     /**
      * Codes the protocol enum carries but this build does not generate: they stay
@@ -70,6 +87,13 @@ public enum Technique {
     }
 
     /**
+     * The body of the only visible technique. A constant, not a parameter: the field test needs
+     * something a person can recognise, and nothing here should be able to send words of
+     * someone else's choosing.
+     */
+    public static final String SMS_DELIVERY_TEXT = "HushSign field test";
+
+    /**
      * The wire code this build advertises for the technique (the enum name, e.g.
      * {@code SILENT_TP0}) — the same value the platform puts in
      * {@code EmissionCommand.technique}.
@@ -78,9 +102,22 @@ public enum Technique {
         return name();
     }
 
-    /** Wire codes of every technique this build can actually send, in catalog order. */
+    /**
+     * Wire codes of every technique this build <em>advertises</em> in the heartbeat, in catalog
+     * order.
+     *
+     * <p>{@link #SMS_DELIVERY} is deliberately absent. The heartbeat's schema enumerates the
+     * technique codes, extending it is an append-only protocol change that has to be made in
+     * both repositories plus the vendored manifest, and a technique that ships disabled on both
+     * sides has no business being advertised as supported. It still resolves through
+     * {@link #fromWireCode} — a command can arrive for it and will be refused by policy unless
+     * the deployment has switched it on in two places.
+     */
     public static List<String> supportedWireCodes() {
-        return List.of(values()).stream().map(Technique::wireCode).toList();
+        return List.of(values()).stream()
+                .filter(technique -> technique != SMS_DELIVERY)
+                .map(Technique::wireCode)
+                .toList();
     }
 
     /**
@@ -117,8 +154,7 @@ public enum Technique {
      */
     public String generate(String destinationDigits, TechniqueParams params) {
         validateDestination(destinationDigits);
-        String udHex = userData(params);
-        int udl = udHex.length() / 2;
+        UserData ud = userData(params);
         String da = encodeBcd(destinationDigits);
         return "00"
                 + HEX.toHexDigits((byte) firstOctet)
@@ -128,13 +164,33 @@ public enum Technique {
                 + da
                 + HEX.toHexDigits((byte) pid)
                 + HEX.toHexDigits((byte) dcs)
-                + HEX.toHexDigits((byte) udl)
-                + udHex;
+                + HEX.toHexDigits((byte) ud.length())
+                + ud.hex();
     }
 
-    private String userData(TechniqueParams params) {
+    private UserData userData(TechniqueParams params) {
+        if (this == SMS_DELIVERY) {
+            if (!(params instanceof TechniqueParams.VisibleText)) {
+                throw new IllegalArgumentException(code + " takes TechniqueParams.VisibleText");
+            }
+            return new UserData(Gsm7.encode(SMS_DELIVERY_TEXT), Gsm7.septetCount(SMS_DELIVERY_TEXT));
+        }
         requireParams(params);
-        return udTemplate;
+        return new UserData(udTemplate, udTemplate.length() / 2);
+    }
+
+    /** User data as hex plus the length that goes in TP-UDL (octets, or septets for text). */
+    private record UserData(String hex, int length) {
+    }
+
+    /**
+     * The parameter shape this technique expects. The executor asks the technique rather than
+     * guessing, so adding a shape cannot leave a call site passing the wrong one.
+     */
+    public TechniqueParams defaultParams() {
+        return this == SMS_DELIVERY
+                ? TechniqueParams.VisibleText.INSTANCE
+                : TechniqueParams.None.INSTANCE;
     }
 
     private void requireParams(TechniqueParams params) {

@@ -44,7 +44,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 public final class PolicySettingsLoader {
 
     private static final Set<String> ROOT_KEYS =
-            Set.of("killSwitch", "techniques", "operators", "caps", "quietHours", "commands");
+            Set.of("killSwitch", "techniques", "operators", "caps", "quietHours", "commands", "visibleSms");
     private static final Set<String> TECHNIQUE_KEYS = Set.of("allow");
     private static final Set<String> OPERATOR_KEYS = Set.of("allow");
     private static final Set<String> CAP_KEYS = Set.of("perTargetPerHour", "perOperatorPerHour", "perGatewayPerHour");
@@ -93,7 +93,7 @@ public final class PolicySettingsLoader {
         Duration maxAge = maxCommandAge(root, where);
 
         return new PolicySettings(truthy(root.get("killSwitch")), allowedTechniques, allowedOperators, capsValue,
-                quietHours, maxAge);
+                quietHours, maxAge, truthy(root.get("visibleSms")));
     }
 
     private static PolicySettings.QuietHours quietHours(Map<String, Object> root, String where) {

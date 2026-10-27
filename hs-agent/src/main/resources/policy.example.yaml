@@ -39,3 +39,9 @@ quietHours:
 # emission an operator authorised.
 commands:
   maxAgeSeconds: 120
+
+# The second key to the one visible technique (SMS_DELIVERY), and it is off unless this line
+# says otherwise. Listing SMS_DELIVERY under techniques.allow is not enough on its own, so a
+# deployment that pastes a whole catalogue into the allow list cannot switch visible messaging on
+# by accident. Leave this false in production: the technique exists for field tests.
+visibleSms: false

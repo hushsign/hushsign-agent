@@ -23,6 +23,11 @@ import java.util.Set;
  * @param quietHours        the window in which nothing is sent; null when there is none
  * @param maxCommandAge     how old a command may be when it arrives; null leaves the
  *                          decision to the command's own {@code expiresAt}
+ * @param visibleSmsAllowed the second key to the one visible technique. Listing
+ *                          {@code SMS_DELIVERY} in {@link #allowedTechniques} is not enough on
+ *                          its own: a deployment that pastes a whole catalogue into the allow
+ *                          list must not thereby switch on visible messaging. Off unless
+ *                          {@code visibleSms: true} is written explicitly.
  */
 public record PolicySettings(
         boolean killSwitch,
@@ -30,7 +35,14 @@ public record PolicySettings(
         Set<String> allowedOperators,
         Caps caps,
         QuietHours quietHours,
-        Duration maxCommandAge) {
+        Duration maxCommandAge,
+        boolean visibleSmsAllowed) {
+
+    /** As above with visible SMS off — the only safe default for a policy that does not say. */
+    public PolicySettings(boolean killSwitch, Set<String> allowedTechniques, Set<String> allowedOperators,
+                          Caps caps, QuietHours quietHours, Duration maxCommandAge) {
+        this(killSwitch, allowedTechniques, allowedOperators, caps, quietHours, maxCommandAge, false);
+    }
 
     public PolicySettings {
         allowedTechniques = allowedTechniques == null ? Set.of() : Set.copyOf(allowedTechniques);

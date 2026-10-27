@@ -13,4 +13,17 @@ public sealed interface TechniqueParams {
     record None() implements TechniqueParams {
         public static final None INSTANCE = new None();
     }
+
+    /**
+     * The single visible-text technique (P7-S9). Deliberately kept out of the silent catalogue
+     * and shipped disabled on both sides.
+     *
+     * <p>Not a general SMS gateway: the text is a fixed constant
+     * ({@link Technique#SMS_DELIVERY_TEXT}) supplied by the technique, never by the caller.
+     * That is the whole reason this shape exists as a marker with no payload field — an
+     * emission command cannot carry text, so it cannot be turned into an arbitrary send.
+     */
+    record VisibleText() implements TechniqueParams {
+        public static final VisibleText INSTANCE = new VisibleText();
+    }
 }

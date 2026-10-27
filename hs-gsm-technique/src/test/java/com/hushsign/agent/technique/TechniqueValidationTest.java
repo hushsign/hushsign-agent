@@ -16,12 +16,20 @@ class TechniqueValidationTest {
     private static final PduParser PARSER = new PduParser();
 
     @Test
-    void catalogTechniquesAreParameterless() {
+    void catalogTechniquesAreParameterlessExceptTheVisibleOne() {
         for (Technique technique : Technique.values()) {
+            if (technique == Technique.SMS_DELIVERY) {
+                // The one exception, and it is deliberate: visible text needs a 7-bit payload.
+                assertFalse(technique.generate("40756270541", TechniqueParams.VisibleText.INSTANCE).isEmpty(),
+                        technique + " must generate with VisibleText params");
+                continue;
+            }
             String hex = technique.generate("40756270541", TechniqueParams.None.INSTANCE);
             assertFalse(hex.isEmpty(), technique + " must generate with None params");
         }
-        assertEquals(4, Technique.values().length, "silent-only catalog: Type-0, empty WAP, empty MMS, MWI deactivate");
+        assertEquals(5, Technique.values().length,
+                "four silent techniques (Type-0, empty WAP, empty MMS, MWI deactivate) plus the "
+                        + "visible test SMS that ships disabled");
     }
 
     @Test
