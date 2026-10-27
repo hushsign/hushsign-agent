@@ -4,6 +4,14 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # The cross-repo drift check compares this repository against hushsign/hushsign-platform
+    # at *its* main. A push can never guarantee that both sides are at the same commit, so
+    # whichever repository is pushed first is red until the other catches up. Cross-repo
+    # agreement is therefore a periodic check (plus a manual one before a release), while
+    # every push still proves this repository's own copy is internally consistent.
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,9 +20,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -26,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Vendored schemas match the vendored manifest
         run: bash scripts/check-protocol-drift.sh protocol/src/main/resources/protocol/schemas
 
@@ -36,21 +44,31 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
       - name: An edited, deleted or reordered entry must break the chain
-        run: ./mvnw -B -pl hs-agent -Dtest=FileAuditChainTest,AuditCliTest test --no-transfer-progress
+        # -am because hs-agent depends on hs-gsm, hs-gsm-technique and hs-protocol: without it
+        # Maven resolves those siblings from the local repository, which on a fresh runner is
+        # empty ("Could not find artifact com.hushsign:hs-gsm-technique"). The second flag
+        # stops the upstream modules from failing because the test filter matches nothing there.
+        run: >-
+          ./mvnw -B -pl hs-agent -am
+          -Dtest=FileAuditChainTest,AuditCliTest
+          -Dsurefire.failIfNoSpecifiedTests=false
+          test --no-transfer-progress
 
   protocol-drift:
+    # Not on push: see the note under `schedule`. This job cannot be green from one side alone.
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Detect platform repo token
         id: detect
         env:
@@ -62,16 +80,23 @@ jobs:
             echo "has_token=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Check out hushsign-platform (canonical protocol)
-        if: ${{ steps.detect.outputs.has_token == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
-        uses: actions/checkout@v4
+        if: ${{ steps.detect.outputs.has_token == 'true' }}
+        uses: actions/checkout@v5
         with:
           repository: hushsign/hushsign-platform
           ref: main
           token: ${{ secrets.PLATFORM_REPO_TOKEN }}
           path: platform-checkout
       - name: Full cross-repo drift check
-        if: ${{ steps.detect.outputs.has_token == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
-        run: bash platform-checkout/libs/protocol/scripts/check-agent-protocol-drift.sh .
+        if: ${{ steps.detect.outputs.has_token == 'true' }}
+        run: |
+          bash platform-checkout/libs/protocol/scripts/check-agent-protocol-drift.sh . || {
+            echo "::error::The vendored protocol copy and hushsign-platform main disagree."
+            echo "Any change under com/hushsign/protocol has to land in BOTH repositories:"
+            echo "  1. change libs/protocol in hushsign-platform and push it;"
+            echo "  2. copy the same files into this repository's protocol/ module and push that."
+            exit 1
+          }
       - name: Cross-repo drift check skipped
-        if: ${{ steps.detect.outputs.has_token != 'true' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) }}
-        run: echo "Cross-repo drift check skipped (PLATFORM_REPO_TOKEN not set or fork PR); the platform repo's CI gates drift on its side."
+        if: ${{ steps.detect.outputs.has_token != 'true' }}
+        run: echo "Cross-repo drift check skipped (PLATFORM_REPO_TOKEN not set); the platform repo's CI gates drift on its side."
