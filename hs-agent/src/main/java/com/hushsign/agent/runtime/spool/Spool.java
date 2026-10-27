@@ -47,6 +47,10 @@ public final class Spool {
     private final long maxBytes;
     private final Deque<SpooledRecord> records = new ArrayDeque<>();
 
+    /** Serialises drains without holding the monitor that producers and readers need. */
+    private final java.util.concurrent.locks.ReentrantLock flushLock =
+            new java.util.concurrent.locks.ReentrantLock();
+
     /** Consecutive failures of the current head record (reset on progress). */
     private int headFailures;
     private long quarantined;
@@ -113,30 +117,47 @@ public final class Spool {
      *
      * @return the number of records published
      */
-    public synchronized int flushTo(SpoolSender sender) {
-        int sent = 0;
-        int removed = 0;
-        for (SpooledRecord record : records) {
-            try {
-                sender.send(record);
-            } catch (Exception e) {
-                if (isPermanent(e) && ++headFailures >= QUARANTINE_AFTER) {
-                    quarantine(record);
-                    quarantined++;
-                    removed++;
-                    headFailures = 0;
-                    continue;
+    public int flushTo(SpoolSender sender) {
+        // The send is network I/O and can block for as long as the broker is unreachable, so it
+        // must not happen under the spool's monitor. Holding it here meant that a down broker
+        // froze everything that touches the spool - enqueue from the emission chain, size() from
+        // the admin API - and the operator asking "what is wrong" got a request that never
+        // answered, which is the moment they need it most.
+        if (!this.flushLock.tryLock()) {
+            return 0; // another flusher is already draining; nothing to do
+        }
+        try {
+            List<SpooledRecord> snapshot = snapshot();
+            int sent = 0;
+            int removed = 0;
+            for (SpooledRecord record : snapshot) {
+                try {
+                    sender.send(record);
+                } catch (Exception e) {
+                    if (isPermanent(e) && ++this.headFailures >= QUARANTINE_AFTER) {
+                        quarantine(record);
+                        this.quarantined++;
+                        removed++;
+                        this.headFailures = 0;
+                        continue;
+                    }
+                    break;
                 }
-                break;
+                this.headFailures = 0;
+                sent++;
+                removed++;
             }
-            headFailures = 0;
-            sent++;
-            removed++;
+            if (removed > 0) {
+                ackFirst(removed);
+            }
+            return sent;
+        } finally {
+            this.flushLock.unlock();
         }
-        if (removed > 0) {
-            ackFirst(removed);
-        }
-        return sent;
+    }
+
+    private synchronized List<SpooledRecord> snapshot() {
+        return List.copyOf(this.records);
     }
 
     /** Records moved aside because they could never be published. */

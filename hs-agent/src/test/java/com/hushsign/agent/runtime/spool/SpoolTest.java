@@ -4,13 +4,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -221,5 +225,35 @@ class SpoolTest {
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    @Test
+    void aBlockedSendDoesNotFreezeProducersOrReaders() throws Exception {
+        // P7-S9 field finding: flushTo used to hold the spool monitor across the Kafka send, so a
+        // broker that was down froze enqueue (the emission chain) and size() (the admin API) for
+        // as long as the send blocked - exactly when an operator asks what is wrong.
+        Spool spool = Spool.open(tempDir.resolve("spool.jsonl"));
+        spool.enqueue("hs.transmissions.v1", "k", "{\"first\":1}");
+        CountDownLatch inSend = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        SpoolSender blocked = record -> {
+            inSend.countDown();
+            release.await(10, TimeUnit.SECONDS);
+        };
+
+        Thread flusher = new Thread(() -> spool.flushTo(blocked), "test-flusher");
+        flusher.setDaemon(true);
+        flusher.start();
+        assertTrue(inSend.await(5, TimeUnit.SECONDS), "the flush must reach the sender");
+
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> assertEquals(1, spool.size()),
+                "size() must not wait for the send");
+        assertTimeoutPreemptively(Duration.ofSeconds(2),
+                () -> spool.enqueue("hs.transmissions.v1", "k2", "{\"second\":2}"),
+                "enqueue must not wait for the send");
+
+        release.countDown();
+        flusher.join(5000);
+        assertTrue(flusher.isAlive() == false, "the flush finishes once the send returns");
     }
 }
