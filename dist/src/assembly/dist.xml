@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  P7-S7: the artefact an operator actually installs.
+
+  A plain lib/ directory rather than a shaded jar on purpose: shading rewrites service loaders
+  and native extraction, and the agent already carries jSerialComm's native library and
+  logback's binding. The cost is a directory of jars; the benefit is that the running classpath
+  is the same set of files the SBOM describes.
+-->
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 https://maven.apache.org/xsd/assembly-2.2.0.xsd">
+  <id>dist</id>
+  <formats>
+    <format>tar.gz</format>
+    <format>zip</format>
+  </formats>
+  <includeBaseDirectory>true</includeBaseDirectory>
+  <baseDirectory>hs-agent-${project.version}</baseDirectory>
+
+  <fileSets>
+    <fileSet>
+      <directory>${project.basedir}/src/main/dist/bin</directory>
+      <outputDirectory>bin</outputDirectory>
+      <fileMode>0755</fileMode>
+    </fileSet>
+    <fileSet>
+      <directory>${project.basedir}/src/main/dist</directory>
+      <outputDirectory>/</outputDirectory>
+      <fileMode>0644</fileMode>
+      <excludes>
+        <exclude>bin/**</exclude>
+        <exclude>install.sh</exclude>
+      </excludes>
+    </fileSet>
+    <fileSet>
+      <directory>${project.basedir}/src/main/dist</directory>
+      <outputDirectory>/</outputDirectory>
+      <fileMode>0755</fileMode>
+      <includes>
+        <include>install.sh</include>
+      </includes>
+    </fileSet>
+    <!-- The examples come from the jar's own resources, so the files an installer copies and
+         the files the build tests are the same files. -->
+    <fileSet>
+      <directory>${project.parent.basedir}/hs-agent/src/main/resources</directory>
+      <outputDirectory>config</outputDirectory>
+      <fileMode>0644</fileMode>
+      <includes>
+        <include>agent.example.yaml</include>
+        <include>policy.example.yaml</include>
+      </includes>
+    </fileSet>
+  </fileSets>
+
+  <dependencySets>
+    <dependencySet>
+      <outputDirectory>lib</outputDirectory>
+      <useProjectArtifact>false</useProjectArtifact>
+      <useTransitiveDependencies>true</useTransitiveDependencies>
+      <useTransitiveFiltering>false</useTransitiveFiltering>
+      <scope>runtime</scope>
+      <fileMode>0644</fileMode>
+    </dependencySet>
+  </dependencySets>
+</assembly>

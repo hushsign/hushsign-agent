@@ -9,5 +9,40 @@
   <artifactId>hs-agent-dist</artifactId>
   <packaging>pom</packaging>
   <name>HushSign Agent — Distribution</name>
-  <description>Multi-arch container, systemd unit, example configs, install script (deliverables land in P7-S7).</description>
+  <description>Systemd unit, example configs, install script and the lib/ directory an operator installs (P7-S7).</description>
+
+  <dependencies>
+    <!-- Declared so the assembly can walk the runtime graph: the dependencySet drops the
+         project's own artefact and keeps hs-agent plus everything it needs. -->
+    <dependency>
+      <groupId>com.hushsign</groupId>
+      <artifactId>hs-agent</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.7.1</version>
+        <executions>
+          <execution>
+            <id>dist</id>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+            <configuration>
+              <descriptors>
+                <descriptor>src/assembly/dist.xml</descriptor>
+              </descriptors>
+              <appendAssemblyId>true</appendAssemblyId>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>

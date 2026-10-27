@@ -1,0 +1,51 @@
+[Unit]
+Description=HushSign edge agent
+Documentation=file:///opt/hs-agent/README.txt
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hushsign
+Group=hushsign
+# The modem lives on a USB serial port, which Debian and Ubuntu grant to dialout.
+SupplementaryGroups=dialout
+
+WorkingDirectory=/var/lib/hs-agent
+StateDirectory=hs-agent
+StateDirectoryMode=0700
+# The full log carries raw SIM identities, so the directory is owner-only as well (P7-S5).
+LogsDirectory=hs-agent
+LogsDirectoryMode=0700
+
+Environment=HS_LOG_DIR=/var/log/hs-agent
+Environment=HS_ADMIN_PORT=9099
+# Everything the agent creates is owner-only: agent.log carries raw SIM identities, and the
+# spool holds outbound records. systemd's default umask would make them 0644.
+UMask=0077
+# HS_ADMIN_TOKEN: leave unset and the agent generates admin.token in the state directory.
+# Other secrets belong in an EnvironmentFile with mode 0600, never in this unit.
+# EnvironmentFile=-/etc/hs-agent/secrets.env
+
+ExecStart=/opt/hs-agent/bin/hs-agent --config /etc/hs-agent/agent.yaml
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=40
+
+# Hardening. PrivateDevices is deliberately absent: the entire purpose of this service is a
+# USB serial modem, and a private /dev would hide it. MemoryDenyWriteExecute is absent too,
+# because the JVM writes generated code.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+ReadWritePaths=/var/lib/hs-agent /var/log/hs-agent
+
+[Install]
+WantedBy=multi-user.target

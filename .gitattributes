@@ -5,3 +5,7 @@ mvnw.cmd text eol=crlf
 *.sh text eol=lf
 *.json text eol=lf
 schemas.sha256 text eol=lf
+# Everything under the distribution is unpacked onto a Linux gateway, including the launcher and
+# the systemd unit. Without this, a Windows checkout puts `#!/usr/bin/env bash\r` in the archive
+# and the installer dies with "No such file or directory" on a file that plainly exists.
+dist/src/main/dist/** text eol=lf

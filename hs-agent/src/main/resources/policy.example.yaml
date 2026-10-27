@@ -1,0 +1,41 @@
+# HushSign agent policy (P7-S1). The agent refuses to start without this file, and refuses any
+# command it cannot justify against it.
+#
+# An empty `allow` list means "any", not "none" — that is deliberate, so the file has to say
+# something rather than fall open by accident. To stop everything, set killSwitch: true; that is
+# the one switch that is explicit and unmistakable.
+
+killSwitch: false
+
+# Which technique codes may be sent. These are the four the platform's catalogue ships enabled;
+# leave a code out to make the agent refuse it even if the platform asks.
+techniques:
+  allow:
+    - SILENT_TP0
+    - WAP_PUSH_EMPTY
+    - MMS_NOTIFY_EMPTY
+    - MWI_DEACTIVATE
+
+# Which networks this gateway may transmit on, as MCC-MNC.
+operators:
+  allow:
+    - 226-10
+
+# Hourly ceilings. 0 means no ceiling; the per-target cap is the one that matters, because it is
+# what stops a mistyped parameter turning into a burst against one subscriber.
+caps:
+  perTargetPerHour: 6
+  perOperatorPerHour: 120
+  perGatewayPerHour: 300
+
+# No sending overnight in the deployment's own time zone. Delete this block for a 24-hour
+# gateway; the hours are compared in `zone`, and a window that crosses midnight is understood.
+quietHours:
+  start: "23:00"
+  end: "06:00"
+  zone: Europe/Bucharest
+
+# A command older than this is refused: an emission that has been queued for an hour is not the
+# emission an operator authorised.
+commands:
+  maxAgeSeconds: 120

@@ -19,6 +19,11 @@ kafka:
     # truststorePassword: set HS_KAFKA_SECURITY_TRUSTSTORE_PASSWORD (only for SSL/SASL_SSL)
 
 modems:
+  # Pin the port on a real gateway: a Huawei-class dongle exposes three ttyUSB interfaces and
+  # only one answers AT, so scanning spends time on the other two at every start. Leave
+  # autoScan true only while bringing a host up and finding out which port is the AT one.
+  #   autoScan: false
+  #   ports: ["/dev/ttyUSB0"]
   autoScan: true
   ports: []                    # when autoScan is false: device paths
   baudRate: 115200

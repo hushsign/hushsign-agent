@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# HushSign agent launcher (P7-S7).
+#
+# One script for both halves of the binary: with no arguments it runs the agent (used by the
+# systemd unit), and `hs-agent ctl status` talks to the admin API of a running one.
+set -euo pipefail
+
+APP_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ -n "${JAVA_HOME:-}" ]; then
+  JAVA="$JAVA_HOME/bin/java"
+else
+  JAVA="java"
+fi
+
+if ! command -v "$JAVA" >/dev/null 2>&1; then
+  echo "hs-agent: no java on PATH and JAVA_HOME is unset; a Java 21 runtime is required" >&2
+  exit 127
+fi
+
+# A 1 GB gateway is a realistic deployment, so the heap is bounded by a share of RAM rather than
+# by a fixed -Xmx that would be wrong on every machine but the developer's. Unquoted below so the
+# options are split into separate arguments; quoting them makes java see one long option name.
+DEFAULT_OPTS="-XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError"
+
+# `ctl` talks to a running agent and needs no log files of its own. Without this it would try to
+# create logs/ under the current directory, which is usually root-owned, and logback would dump
+# its whole configuration status because the appenders could not open their files.
+if [ "${1:-}" = "ctl" ]; then
+  if [ -z "${HS_LOG_DIR:-}" ]; then
+    HS_LOG_DIR="${TMPDIR:-/tmp}/hs-agent-${UID}"
+    export HS_LOG_DIR
+  fi
+  # The admin token lives next to the agent's state, not in the operator's current directory.
+  if [ -z "${HS_AGENT_WORKDIR:-}" ] && [ -d /var/lib/hs-agent ]; then
+    HS_AGENT_WORKDIR=/var/lib/hs-agent
+    export HS_AGENT_WORKDIR
+  fi
+fi
+
+# shellcheck disable=SC2086
+exec "$JAVA" ${HS_AGENT_JAVA_OPTS:-$DEFAULT_OPTS} -cp "$APP_HOME/lib/*" \
+  com.hushsign.agent.AgentMain "$@"
