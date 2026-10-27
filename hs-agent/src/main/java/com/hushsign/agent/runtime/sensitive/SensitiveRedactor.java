@@ -18,8 +18,10 @@ import java.util.regex.Pattern;
 public final class SensitiveRedactor {
 
     /**
-     * A run of 11 to 20 digits, optionally led by {@code +}. Shorter runs are
-     * ports, counters and durations. Longer runs are hashes and identifiers —
+     * A run of 11 to 20 digits, optionally led by {@code +}, or a national-format number (a
+     * leading zero and nine more digits). A {@code 07...} number is only ten digits, so it used
+     * to survive in clear even though it names the same subscriber as {@code +407...}.
+     * Shorter runs are ports, counters and durations. Longer runs are hashes and identifiers —
      * although a hex digest can still contain a 20-digit run, and it is masked
      * when it does: the clean log is the one that leaves the device, and the
      * unscrubbed original is always still in {@code agent.log} and in the audit
@@ -28,7 +30,8 @@ public final class SensitiveRedactor {
      * <p>Twenty is the ceiling because an ICCID is up to 20 digits, and an ICCID
      * identifies a SIM just as surely as an IMSI does.
      */
-    private static final Pattern SUBSCRIBER_NUMBER = Pattern.compile("(?<!\\d)(\\+?\\d{11,20})(?!\\d)");
+    private static final Pattern SUBSCRIBER_NUMBER = Pattern.compile(
+            "(?<!\\d)(\\+?\\d{11,20}|0\\d{9})(?!\\d)");
 
     private SensitiveRedactor() {
     }
