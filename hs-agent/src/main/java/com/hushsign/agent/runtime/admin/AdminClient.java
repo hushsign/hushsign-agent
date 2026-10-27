@@ -59,11 +59,31 @@ public final class AdminClient {
                 Thread.currentThread().interrupt();
             }
             try {
-                err.append("cannot reach the agent: ").append(String.valueOf(e.getMessage())).append('\n');
+                err.append("cannot reach the agent: ").append(describe(e, resolvedPortOrZero()))
+                        .append('\n');
             } catch (IOException ignored) {
                 // Nothing useful left to do with a broken stderr.
             }
             return FAILED;
+        }
+    }
+
+    /** A ConnectException carries no message, and "null" tells an operator nothing. */
+    private static String describe(Exception e, int port) {
+        if (e instanceof java.net.ConnectException) {
+            return "connection refused on 127.0.0.1:" + port + " (is hs-agent running?)";
+        }
+        if (e instanceof java.net.http.HttpTimeoutException) {
+            return "the agent did not answer within " + TIMEOUT.toSeconds() + "s";
+        }
+        return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+    }
+
+    private static int resolvedPortOrZero() {
+        try {
+            return AdminSettings.configuredPort();
+        } catch (RuntimeException e) {
+            return 0;
         }
     }
 
