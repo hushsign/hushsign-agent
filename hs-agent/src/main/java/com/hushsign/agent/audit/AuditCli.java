@@ -95,6 +95,14 @@ public final class AuditCli {
 
     private static int verify(FileAuditChain chain) {
         AuditLog.ChainVerification verification = chain.verify();
+        if (verification.entries() == 0) {
+            // "0 entries, chain intact" is the answer you get for a chain that was deleted, and
+            // it is indistinguishable from a chain that was never written. Neither is a pass for
+            // an operator who just ran verify on a device that has been sending for weeks.
+            System.out.println("FAILED: no entries found under " + chain.location()
+                    + " - wrong --dir, or the chain was removed");
+            return 1;
+        }
         if (verification.ok()) {
             System.out.println("OK: " + verification.entries() + " entries, chain intact (" + chain.location() + ")");
             return 0;

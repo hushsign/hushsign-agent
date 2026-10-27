@@ -52,6 +52,15 @@ class AuditCliTest {
     }
 
     @Test
+    void verifyExitsOneWhenThereIsNoChainAtAll(@TempDir Path dir) throws IOException {
+        // "OK: 0 entries, chain intact" is what a deleted chain says. It reads as a pass, and an
+        // operator who has just checked a device that has been sending for weeks believes it.
+        Path empty = Files.createDirectories(dir.resolve("empty"));
+
+        assertEquals(1, AuditCli.run(new String[] {"verify", "--dir", empty.toString()}));
+    }
+
+    @Test
     void tailPrintsTheNewestEntries(@TempDir Path dir) throws IOException {
         Path workDir = chainIn(dir);
 
