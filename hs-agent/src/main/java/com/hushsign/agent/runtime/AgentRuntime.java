@@ -2,6 +2,11 @@ package com.hushsign.agent.runtime;
 
 import com.hushsign.agent.config.AgentConfig;
 import com.hushsign.agent.gsm.modem.Modem;
+import com.hushsign.agent.runtime.admin.AdminRuntime;
+import com.hushsign.agent.runtime.admin.AdminState;
+import com.hushsign.agent.runtime.admin.AdminStatus;
+import com.hushsign.agent.runtime.admin.ModemStatus;
+import com.hushsign.agent.runtime.sensitive.Sensitive;
 import com.hushsign.agent.runtime.cancel.CancellationConsumer;
 import com.hushsign.agent.runtime.cancel.CancellationStore;
 import com.hushsign.agent.runtime.cancel.CancellingEmissionHandler;
@@ -15,6 +20,7 @@ import com.hushsign.agent.runtime.kafka.EmissionConsumer;
 import com.hushsign.agent.runtime.kafka.EmissionHandler;
 import com.hushsign.agent.runtime.kafka.KafkaSpoolSender;
 import com.hushsign.agent.runtime.kafka.PolicyCheckingEmissionHandler;
+import com.hushsign.agent.runtime.audit.AuditLog;
 import com.hushsign.agent.runtime.audit.FileAuditChain;
 import com.hushsign.agent.runtime.policy.engine.HourlyCounter;
 import com.hushsign.agent.runtime.policy.engine.PolicyEngine;
@@ -58,7 +64,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * simulator module, so the "real" runtime would have been written twice. The
  * simulator now starts this same runtime with a mock modem.
  */
-public final class AgentRuntime implements AutoCloseable {
+public final class AgentRuntime implements AutoCloseable, AdminRuntime {
 
     private static final Logger LOG = LoggerFactory.getLogger(AgentRuntime.class);
 
@@ -70,6 +76,13 @@ public final class AgentRuntime implements AutoCloseable {
     private final HeartbeatProducer heartbeat;
     private final long heartbeatIntervalMs;
     private final Modem modem;
+    private final String agentVersion;
+    private final PolicyEngine policy;
+    private final Path policyFile;
+    private final Path configFile;
+    private final FileAuditChain audit;
+    private final AdminState admin;
+    private final HeartbeatSource heartbeatSource;
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicLong flushed = new AtomicLong();
     private final Instant startedAt = Instant.now();
@@ -81,15 +94,25 @@ public final class AgentRuntime implements AutoCloseable {
 
     private AgentRuntime(String gatewayId, Spool spool, KafkaSpoolSender sender,
                          List<EmissionConsumer> consumers, CancellationConsumer cancellationConsumer,
-                         HeartbeatProducer heartbeat, long heartbeatIntervalMs, Modem modem) {
+                         HeartbeatProducer heartbeat, HeartbeatSource heartbeatSource,
+                         long heartbeatIntervalMs, Modem modem, String agentVersion,
+                         PolicyEngine policy, Path policyFile, Path configFile, FileAuditChain audit,
+                         AdminState admin) {
         this.gatewayId = gatewayId;
         this.spool = spool;
         this.sender = sender;
         this.consumers = consumers;
         this.cancellationConsumer = cancellationConsumer;
         this.heartbeat = heartbeat;
+        this.heartbeatSource = heartbeatSource;
         this.heartbeatIntervalMs = heartbeatIntervalMs;
         this.modem = modem;
+        this.agentVersion = agentVersion;
+        this.policy = policy;
+        this.policyFile = policyFile;
+        this.configFile = configFile;
+        this.audit = audit;
+        this.admin = admin;
     }
 
     /**
@@ -123,10 +146,13 @@ public final class AgentRuntime implements AutoCloseable {
         // P7-S1: the policy is loaded from disk before any consumer starts, and a missing or
         // invalid file stops the agent. An agent that cannot say what it is allowed to send is
         // an agent that must not send.
-        PolicySettings policySettings = PolicySettingsLoader.load(
-                workDir.resolve(config.policy().path()).normalize());
+        Path policyFile = workDir.resolve(config.policy().path()).normalize();
+        PolicySettings policySettings = PolicySettingsLoader.load(policyFile);
+        // P7-S4: pause and kill are runtime flags the admin API flips; the engine consults them
+        // before the file's own kill switch, so an operator acting now outranks the config.
+        AdminState adminState = new AdminState();
         PolicyEngine policy = new PolicyEngine(policySettings, config.gatewayId(),
-                new HourlyCounter(clock), clock);
+                new HourlyCounter(clock), clock, adminState);
         LOG.info("policy loaded from {}: killSwitch={} techniques={} operators={} caps={}/{}/{} quietHours={}",
                 policySettings, policySettings.killSwitch(), policySettings.allowedTechniques(),
                 policySettings.allowedOperators(), policySettings.caps().perTargetPerHour(),
@@ -157,7 +183,8 @@ public final class AgentRuntime implements AutoCloseable {
         HeartbeatProducer heartbeat = new HeartbeatProducer(source, spool);
 
         AgentRuntime runtime = new AgentRuntime(config.gatewayId(), spool, sender, consumers,
-                cancellationConsumer, heartbeat, config.heartbeat().intervalSeconds() * 1000L, modem);
+                cancellationConsumer, heartbeat, source, config.heartbeat().intervalSeconds() * 1000L,
+                modem, agentVersion, policy, policyFile, configFile, audit, adminState);
         runtime.startThreads();
         runtime.installShutdownHook();
         return runtime;
@@ -250,6 +277,90 @@ public final class AgentRuntime implements AutoCloseable {
 
     public Spool spool() {
         return spool;
+    }
+
+    /** The audit chain, so the admin surface records into the same one the CLI verifies. */
+    public AuditLog auditLog() {
+        return audit;
+    }
+
+
+    @Override
+    public AdminStatus status() {
+        AuditLog.ChainVerification verification = audit.verify();
+        PolicySettings settings = policy.settings();
+        return new AdminStatus(
+                gatewayId,
+                agentVersion,
+                Duration.between(startedAt, Instant.now()).toSeconds(),
+                admin.paused(),
+                admin.killed(),
+                settings.killSwitch(),
+                List.copyOf(settings.allowedTechniques()),
+                policyFile == null ? null : policyFile.toString(),
+                configFile == null ? null : configFile.toString(),
+                heartbeatSource.policyHash(),
+                heartbeatSource.configHash(),
+                spool.size(),
+                spool.sizeBytes(),
+                spool.quarantined(),
+                flushed.get(),
+                verification.ok(),
+                verification.entries(),
+                audit.location());
+    }
+
+    @Override
+    public List<ModemStatus> modems() {
+        var info = modem.getDeviceInformation();
+        return List.of(new ModemStatus(
+                modem.portName(),
+                modem.state().name(),
+                info == null ? "" : Sensitive.of(info.getImsi()).masked(),
+                info == null ? null : info.getManufacturer(),
+                info == null ? null : info.getModel(),
+                info == null ? null : info.getSerialNo(),
+                info == null ? 0 : info.getRssi()));
+    }
+
+    /**
+     * Re-reads the policy file. A file that does not parse leaves the rules already in force
+     * untouched — an operator who saves a typo must not silently disable the policy — and the
+     * hourly counters are deliberately kept, because a reload is not a way to reset a cap.
+     */
+    @Override
+    public PolicyReload reloadPolicy() {
+        if (policyFile == null) {
+            return PolicyReload.refused("no policy file to reload");
+        }
+        try {
+            PolicySettings reloaded = PolicySettingsLoader.load(policyFile);
+            policy.applyPolicy(reloaded);
+            LOG.warn("policy reloaded from {}: killSwitch={} techniques={} operators={}",
+                    policyFile, reloaded.killSwitch(), reloaded.allowedTechniques(),
+                    reloaded.allowedOperators());
+            return PolicyReload.accepted("killSwitch=" + reloaded.killSwitch()
+                    + " techniques=" + reloaded.allowedTechniques()
+                    + " operators=" + reloaded.allowedOperators());
+        } catch (RuntimeException e) {
+            LOG.warn("policy reload refused, previous rules still in force: {}", e.getMessage());
+            return PolicyReload.refused(String.valueOf(e.getMessage()));
+        }
+    }
+
+    @Override
+    public boolean pause() {
+        return admin.pause();
+    }
+
+    @Override
+    public boolean resume() {
+        return admin.resume();
+    }
+
+    @Override
+    public boolean kill() {
+        return admin.kill();
     }
 
     @Override

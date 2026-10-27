@@ -10,13 +10,18 @@ import com.hushsign.agent.gsm.modem.PduSubmission;
 import com.hushsign.agent.gsm.serial.JSerialCommPortFactory;
 import com.hushsign.agent.gsm.serial.SerialPortFactory;
 import com.hushsign.agent.runtime.AgentRuntime;
+import com.hushsign.agent.runtime.admin.AdminClient;
+import com.hushsign.agent.runtime.admin.AdminServer;
+import com.hushsign.agent.runtime.admin.AdminSettings;
 import com.hushsign.agent.runtime.sensitive.LogDirectory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Entry point of the edge agent (P1-S13): load {@code agent.yaml}, claim one
@@ -34,6 +39,12 @@ public final class AgentMain {
     }
 
     public static void main(String[] args) throws Exception {
+        if (args.length > 0 && "ctl".equals(args[0])) {
+            // The client half of P7-S4: same binary, so an operator on the gateway has the tool
+            // without a second artifact to install.
+            System.exit(AdminClient.run(Arrays.copyOfRange(args, 1, args.length),
+                    Path.of(".").toAbsolutePath(), System.out, System.err));
+        }
         if (!LogDirectory.harden(LogDirectory.configured())) {
             LOG.info("log directory is not owner-only; agent.log carries raw SIM identities, so keep it on the device");
         }
@@ -47,10 +58,33 @@ public final class AgentMain {
 
         AgentRuntime runtime = AgentRuntime.start(config, configFile, modem,
                 version(AgentMain.class.getPackage().getImplementationVersion()));
+        Optional<AdminServer> adminServer = startAdminServer(config, runtime);
         try {
             runtime.awaitTermination();
         } finally {
+            adminServer.ifPresent(AdminServer::close);
             runtime.close();
+        }
+    }
+
+    /**
+     * Brings up the local control surface (P7-S4). A failure here is reported but does not stop
+     * the agent: losing the ability to pause is an operational problem, while refusing to send
+     * because a port was busy would be an outage. The line is logged at ERROR so it cannot be
+     * missed in a startup log.
+     */
+    private static Optional<AdminServer> startAdminServer(AgentConfig config, AgentRuntime runtime) {
+        try {
+            Optional<AdminSettings> settings =
+                    AdminSettings.resolve(Path.of(config.workDir()).toAbsolutePath());
+            if (settings.isEmpty()) {
+                LOG.info("admin API disabled (HS_ADMIN_PORT={})", AdminSettings.configuredPort());
+                return Optional.empty();
+            }
+            return Optional.of(AdminServer.start(settings.get(), runtime, runtime.auditLog()));
+        } catch (IOException | RuntimeException e) {
+            LOG.error("admin API not started, the agent keeps running: {}", e.toString());
+            return Optional.empty();
         }
     }
 

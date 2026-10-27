@@ -2,6 +2,7 @@ package com.hushsign.agent.runtime.policy.engine;
 
 import com.hushsign.agent.runtime.policy.PolicyDecision;
 import com.hushsign.agent.runtime.policy.PolicyProvider;
+import com.hushsign.agent.runtime.policy.RuntimeState;
 import com.hushsign.protocol.v1.EmissionCommand;
 import java.time.Clock;
 import java.time.Duration;
@@ -38,16 +39,38 @@ import java.util.Objects;
  */
 public final class PolicyEngine implements PolicyProvider {
 
-    private final PolicySettings settings;
     private final String gatewayId;
     private final HourlyCounter counter;
     private final Clock clock;
+    private final RuntimeState state;
+
+    /**
+     * Volatile rather than final since P7-S4: the admin API can reload the file, and every
+     * consumer thread must see the new rules on its next command. The swap is a single
+     * reference assignment, so no command can ever be judged against half a policy.
+     */
+    private volatile PolicySettings settings;
 
     public PolicyEngine(PolicySettings settings, String gatewayId, HourlyCounter counter, Clock clock) {
+        this(settings, gatewayId, counter, clock, RuntimeState.RUNNING);
+    }
+
+    public PolicyEngine(PolicySettings settings, String gatewayId, HourlyCounter counter, Clock clock,
+                        RuntimeState state) {
         this.settings = Objects.requireNonNull(settings, "settings");
         this.gatewayId = Objects.requireNonNull(gatewayId, "gatewayId");
         this.counter = Objects.requireNonNull(counter, "counter");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.state = Objects.requireNonNull(state, "state");
+    }
+
+    /** Replaces the rules in force. Counters are deliberately kept: a reload must not reset a cap. */
+    public void applyPolicy(PolicySettings reloaded) {
+        this.settings = Objects.requireNonNull(reloaded, "reloaded");
+    }
+
+    public PolicySettings settings() {
+        return this.settings;
     }
 
     @Override
@@ -55,8 +78,11 @@ public final class PolicyEngine implements PolicyProvider {
         if (command == null) {
             return PolicyDecision.reject("no command");
         }
-        if (settings.killSwitch()) {
+        if (this.state.killed() || settings.killSwitch()) {
             return PolicyDecision.reject("kill switch engaged");
+        }
+        if (this.state.paused()) {
+            return PolicyDecision.reject("agent is paused by the operator");
         }
         PolicyDecision freshness = freshness(command);
         if (!freshness.allowed()) {
