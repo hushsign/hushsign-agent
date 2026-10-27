@@ -29,7 +29,7 @@ public final class SimulatedAgentApp {
 
     private static final Logger LOG = LoggerFactory.getLogger(SimulatedAgentApp.class);
 
-    private static final String GATEWAY_ID = "sim-gw-01";
+    private static final String GATEWAY_ID = "5e0f7a10-0000-4000-8000-00000000c0de";
     private static final String SIM_ID = "SIM0";
 
     private SimulatedAgentApp() {

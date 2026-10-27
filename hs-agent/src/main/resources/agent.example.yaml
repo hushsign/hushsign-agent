@@ -3,7 +3,7 @@
 # HS_KAFKA_BOOTSTRAP_SERVERS, HS_MODEMS_PORTS, HS_DEDUPE_MAX_ENTRIES, ...
 # Secrets (SASL password) must come from the environment, never from this file.
 
-gatewayId: gw-buc-01
+gatewayId: 4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11   # the uuid the fleet registry assigned to this gateway
 operators: ["226-10"]
 workDir: .
 
@@ -30,7 +30,7 @@ modems:
   # "FULL_HEX" is the standard AT+CMGS form. Huawei K3765-family firmware
   # rejects it with +CMS ERROR: 304 and needs "TPDU_HEX" (P1-S14).
   pduSubmission: FULL_HEX
-  # simPin: set HS_MODEMS_SIM_PIN — never commit a PIN to this file
+  # simPin: set HS_MODEMS_SIM_PIN â€” never commit a PIN to this file
 
 heartbeat:
   intervalSeconds: 30

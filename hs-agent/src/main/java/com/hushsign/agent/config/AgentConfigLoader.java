@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -90,9 +91,10 @@ public final class AgentConfigLoader {
         checkKeys(root, ROOT_KEYS, "");
 
         String gatewayId = str(root, "", "gatewayId", env, null);
-        if (gatewayId == null || gatewayId.isBlank() || gatewayId.length() > 128) {
+        if (gatewayId == null || gatewayId.isBlank()) {
             throw new ConfigException("gatewayId is required (file key gatewayId or env HS_GATEWAY_ID)");
         }
+        gatewayId = canonicalGatewayId(gatewayId);
         List<String> operators = strList(root, "", "operators", env, List.of());
         if (operators.isEmpty()) {
             throw new ConfigException("operators is required (at least one MCC-MNC like 226-10)");
@@ -169,6 +171,24 @@ public final class AgentConfigLoader {
     // ==================================================
     // helpers
     // ==================================================
+
+    /**
+     * The gateway id must be the uuid the fleet registry assigned.
+     *
+     * <p>Every platform consumer - heartbeat, transmission result, audit digest - parses this
+     * field as a {@code UUID} and drops what it cannot parse, logging a warning nobody reads.
+     * A friendly name here therefore does not fail: it produces a gateway that starts, sends and
+     * looks healthy while the platform discards all of it. Failing at startup is the only
+     * outcome that does not waste an operator's afternoon.
+     */
+    private static String canonicalGatewayId(String value) {
+        try {
+            return UUID.fromString(value.trim()).toString();
+        } catch (IllegalArgumentException e) {
+            throw new ConfigException("gatewayId must be the uuid the fleet registry assigned "
+                    + "(for example 4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11), got '" + value.trim() + "'");
+        }
+    }
 
     private static Map<String, Object> section(Map<String, Object> parent, String name) {
         Object value = parent.get(name);

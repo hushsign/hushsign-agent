@@ -36,7 +36,7 @@ class AgentConfigLoaderTest {
 
         AgentConfig config = AgentConfigLoader.load(file, Map.of());
 
-        assertEquals("gw-buc-01", config.gatewayId());
+        assertEquals("4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", config.gatewayId());
         assertEquals(List.of("226-10"), config.operators());
         assertEquals("localhost:9092", config.kafka().bootstrapServers());
         assertEquals("PLAINTEXT", config.kafka().security().protocol());
@@ -54,14 +54,34 @@ class AgentConfigLoaderTest {
         assertThrows(ConfigException.class, () -> AgentConfigLoader.load(null, Map.of()),
                 "gatewayId must be required");
         assertThrows(ConfigException.class,
-                () -> AgentConfigLoader.load(null, Map.of("HS_GATEWAY_ID", "gw-1")),
+                () -> AgentConfigLoader.load(null, Map.of("HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11")),
                 "operators must be required");
+    }
+
+    @Test
+    void aGatewayIdThatIsNotAUuidIsRefusedAtStartup() {
+        ConfigException refused = assertThrows(ConfigException.class,
+                () -> AgentConfigLoader.load(null,
+                        Map.of("HS_GATEWAY_ID", "gw-buc-01", "HS_OPERATORS", "226-10")));
+
+        assertTrue(refused.getMessage().contains("uuid"), refused.getMessage());
+        assertTrue(refused.getMessage().contains("fleet registry"), "the operator needs to know where the id comes from");
+    }
+
+    @Test
+    void aGatewayIdIsCanonicalised() {
+        // An operator who pastes the id from the console in upper case gets the same identity,
+        // not a second gateway that never matches the fleet row.
+        AgentConfig config = AgentConfigLoader.load(null, Map.of(
+                "HS_GATEWAY_ID", "4F2C9C1E-0F4E-4F36-9D43-2F0A4A6B1C11", "HS_OPERATORS", "226-10"));
+
+        assertEquals("4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", config.gatewayId());
     }
 
     @Test
     void defaultsApplyWhenTheFileIsMissing() {
         AgentConfig config = AgentConfigLoader.load(null, Map.of(
-                "HS_GATEWAY_ID", "gw-1", "HS_OPERATORS", "226-10"));
+                "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "226-10"));
 
         assertEquals(".", config.workDir());
         assertEquals("localhost:9092", config.kafka().bootstrapServers());
@@ -73,7 +93,7 @@ class AgentConfigLoaderTest {
     @Test
     void environmentOverridesTheFile() throws Exception {
         Path file = write("""
-                gatewayId: gw-from-file
+                gatewayId: 9a1e5f2b-1111-4a2b-8c3d-000000000000
                 operators: ["226-10"]
                 heartbeat:
                   intervalSeconds: 30
@@ -85,14 +105,14 @@ class AgentConfigLoaderTest {
                 """);
 
         AgentConfig config = AgentConfigLoader.load(file, Map.of(
-                "HS_GATEWAY_ID", "gw-from-env",
+                "HS_GATEWAY_ID", "9a1e5f2b-1111-4a2b-8c3d-000000000001",
                 "HS_HEARTBEAT_INTERVAL_SECONDS", "15",
                 "HS_DEDUPE_MAX_ENTRIES", "5000",
                 "HS_MODEMS_AUTO_SCAN", "false",
                 "HS_MODEMS_PORTS", "/dev/ttyUSB0, /dev/ttyUSB1",
                 "HS_KAFKA_BOOTSTRAP_SERVERS", "kafka.internal:9093"));
 
-        assertEquals("gw-from-env", config.gatewayId());
+        assertEquals("9a1e5f2b-1111-4a2b-8c3d-000000000001", config.gatewayId());
         assertEquals(15, config.heartbeat().intervalSeconds());
         assertEquals(5000, config.dedupe().maxEntries());
         assertFalse(config.modems().autoScan());
@@ -103,7 +123,7 @@ class AgentConfigLoaderTest {
     @Test
     void saslPasswordComesFromTheEnvironment() throws Exception {
         Path file = write("""
-                gatewayId: gw-1
+                gatewayId: 4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11
                 operators: ["226-10"]
                 kafka:
                   bootstrapServers: kafka:9092
@@ -125,14 +145,14 @@ class AgentConfigLoaderTest {
     @Test
     void unknownKeysAreRejected() throws Exception {
         Path file = write("""
-                gatewayId: gw-1
+                gatewayId: 4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11
                 operators: ["226-10"]
                 bogusKey: true
                 """);
         assertThrows(ConfigException.class, () -> AgentConfigLoader.load(file, Map.of()));
 
         Path nested = write("""
-                gatewayId: gw-1
+                gatewayId: 4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11
                 operators: ["226-10"]
                 modems:
                   baud: 9600
@@ -143,21 +163,21 @@ class AgentConfigLoaderTest {
     @Test
     void invalidValuesAreRejected() throws Exception {
         assertThrows(ConfigException.class,
-                () -> AgentConfigLoader.load(null, Map.of("HS_GATEWAY_ID", "gw-1", "HS_OPERATORS", "abc")),
+                () -> AgentConfigLoader.load(null, Map.of("HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "abc")),
                 "operators must match MCC-MNC");
         assertThrows(ConfigException.class,
                 () -> AgentConfigLoader.load(null, Map.of(
-                        "HS_GATEWAY_ID", "gw-1", "HS_OPERATORS", "226-10",
+                        "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "226-10",
                         "HS_HEARTBEAT_INTERVAL_SECONDS", "0")),
                 "interval must be positive");
         assertThrows(ConfigException.class,
                 () -> AgentConfigLoader.load(null, Map.of(
-                        "HS_GATEWAY_ID", "gw-1", "HS_OPERATORS", "226-10",
+                        "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "226-10",
                         "HS_MODEMS_AUTO_SCAN", "yes")),
                 "booleans must be true/false");
         assertThrows(ConfigException.class,
                 () -> AgentConfigLoader.load(null, Map.of(
-                        "HS_GATEWAY_ID", "gw-1", "HS_OPERATORS", "226-10",
+                        "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "226-10",
                         "HS_MODEMS_BAUD_RATE", "fast")),
                 "ints must parse");
     }
@@ -165,7 +185,7 @@ class AgentConfigLoaderTest {
     @Test
     void nonMappingSectionsAreRejected() throws Exception {
         Path file = write("""
-                gatewayId: gw-1
+                gatewayId: 4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11
                 operators: ["226-10"]
                 modems: 9600
                 """);
@@ -175,7 +195,7 @@ class AgentConfigLoaderTest {
     @Test
     void autoScanFalseRequiresExplicitPorts() throws Exception {
         Path file = write("""
-                gatewayId: gw-1
+                gatewayId: 4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11
                 operators: ["226-10"]
                 modems:
                   autoScan: false
@@ -184,7 +204,7 @@ class AgentConfigLoaderTest {
         assertThrows(ConfigException.class, () -> AgentConfigLoader.load(file, Map.of()));
 
         Path ok = write("""
-                gatewayId: gw-1
+                gatewayId: 4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11
                 operators: ["226-10"]
                 modems:
                   autoScan: false
@@ -198,7 +218,7 @@ class AgentConfigLoaderTest {
     @Test
     void pduSubmissionIsSelectableAndValidated() throws Exception {
         Path file = write("""
-                gatewayId: gw-1
+                gatewayId: 4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11
                 operators: ["226-10"]
                 modems:
                   autoScan: false
@@ -211,7 +231,7 @@ class AgentConfigLoaderTest {
                 "the Huawei K3765 family needs the TPDU form (P1-S14)");
 
         assertThrows(ConfigException.class, () -> AgentConfigLoader.load(null, Map.of(
-                "HS_GATEWAY_ID", "gw-1", "HS_OPERATORS", "226-10",
+                "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "226-10",
                 "HS_MODEMS_AUTO_SCAN", "false", "HS_MODEMS_PORTS", "COM6",
                 "HS_MODEMS_PDU_SUBMISSION", "binary")));
     }
@@ -219,7 +239,7 @@ class AgentConfigLoaderTest {
     @Test
     void simPinComesFromTheEnvironment() {
         AgentConfig config = AgentConfigLoader.load(null, Map.of(
-                "HS_GATEWAY_ID", "gw-1",
+                "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11",
                 "HS_OPERATORS", "226-10",
                 "HS_MODEMS_SIM_PIN", "1234"));
 
