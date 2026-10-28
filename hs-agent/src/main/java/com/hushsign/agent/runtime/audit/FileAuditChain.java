@@ -287,12 +287,12 @@ public final class FileAuditChain implements AuditLog {
     private static AuditEntry fromJson(tools.jackson.databind.JsonNode node) {
         return new AuditEntry(
                 node.path("seq").asLong(),
-                Instant.parse(node.path("at").asText()),
-                node.path("gatewayId").asText(),
-                node.path("type").asText(),
-                node.hasNonNull(FIELD_EMISSION_ID) ? node.get(FIELD_EMISSION_ID).asText() : null,
-                node.hasNonNull(FIELD_DETAIL) ? node.get(FIELD_DETAIL).asText() : null,
-                node.path("prevHash").asText(),
-                node.path("hash").asText());
+                Instant.parse(node.path("at").asString()),
+                node.path("gatewayId").asString(),
+                node.path("type").asString(),
+                node.hasNonNull(FIELD_EMISSION_ID) ? node.get(FIELD_EMISSION_ID).asString() : null,
+                node.hasNonNull(FIELD_DETAIL) ? node.get(FIELD_DETAIL).asString() : null,
+                node.path("prevHash").asString(),
+                node.path("hash").asString());
     }
 }
