@@ -194,7 +194,7 @@ public final class AgentConfigLoader {
     private static String canonicalGatewayId(String value) {
         try {
             return UUID.fromString(value.trim()).toString();
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             throw new ConfigException("gatewayId must be the uuid the fleet registry assigned "
                     + "(for example 4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11), got '" + value.trim() + "'");
         }
@@ -265,7 +265,7 @@ public final class AgentConfigLoader {
     private static long parseLong(String name, String raw) {
         try {
             return Long.parseLong(raw.trim());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException _) {
             throw new ConfigException(name + " must be an integer, got '" + raw + "'");
         }
     }

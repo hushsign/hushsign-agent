@@ -43,7 +43,7 @@ public final class LogDirectory {
             }
             Files.setPosixFilePermissions(directory, OWNER_ONLY);
             return true;
-        } catch (IOException e) {
+        } catch (IOException _) {
             return false;
         }
     }

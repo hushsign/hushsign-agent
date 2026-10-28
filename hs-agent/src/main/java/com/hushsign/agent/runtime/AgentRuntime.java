@@ -275,7 +275,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         Thread shutdownHook = new Thread(this::close, "hs-agent-shutdown");
         try {
             Runtime.getRuntime().addShutdownHook(shutdownHook);
-        } catch (IllegalStateException e) {
+        } catch (IllegalStateException _) {
             LOG.debug("shutdown hook not installed (JVM already shutting down)");
         }
     }
@@ -465,7 +465,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
     private static void sleepQuietly(long ms) {
         try {
             Thread.sleep(ms);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         }
     }
@@ -587,7 +587,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
             }
             try {
                 return Hashes.sha256(Files.readAllBytes(file));
-            } catch (IOException | RuntimeException e) {
+            } catch (IOException | RuntimeException _) {
                 return Hashes.sha256(fallback);
             }
         }

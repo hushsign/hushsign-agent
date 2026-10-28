@@ -113,8 +113,8 @@ public final class PolicySettingsLoader {
         Object zone = quiet.get("zone");
         ZoneId zoneId;
         try {
-            zoneId = zone == null ? ZoneId.of("UTC") : ZoneId.of(String.valueOf(zone).trim());
-        } catch (java.time.DateTimeException e) {
+            zoneId = ZoneId.of(zone == null ? "UTC" : String.valueOf(zone).trim());
+        } catch (java.time.DateTimeException _) {
             throw new ConfigException("quietHours.zone is not a zone id: " + zone + " (" + where + ")");
         }
         return new PolicySettings.QuietHours(start, end, zoneId);
@@ -136,7 +136,7 @@ public final class PolicySettingsLoader {
         }
         try {
             return LocalTime.parse(String.valueOf(value).trim());
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException _) {
             throw new ConfigException(key + " must be HH:mm, got " + value + " (" + where + ")");
         }
     }

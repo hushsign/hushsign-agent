@@ -61,7 +61,7 @@ public final class AdminClient {
             try {
                 err.append("cannot reach the agent: ").append(describe(e, resolvedPortOrZero()))
                         .append('\n');
-            } catch (IOException ignored) {
+            } catch (IOException _) {
                 // Nothing useful left to do with a broken stderr.
             }
             return FAILED;
@@ -82,7 +82,7 @@ public final class AdminClient {
     private static int resolvedPortOrZero() {
         try {
             return AdminSettings.configuredPort();
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             return 0;
         }
     }
@@ -117,7 +117,7 @@ public final class AdminClient {
                 """;
         try {
             err.append(usage);
-        } catch (IOException ignored) {
+        } catch (IOException _) {
             // Nothing useful left to do with a broken stderr.
         }
     }

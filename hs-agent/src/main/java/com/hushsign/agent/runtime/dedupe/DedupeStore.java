@@ -165,7 +165,7 @@ public final class DedupeStore {
         try {
             Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
                     java.nio.file.StandardCopyOption.ATOMIC_MOVE);
-        } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+        } catch (java.nio.file.AtomicMoveNotSupportedException _) {
             Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
     }

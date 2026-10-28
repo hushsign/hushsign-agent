@@ -92,7 +92,7 @@ class AtLayerSmokeTest {
         Thread responder = new Thread(() -> {
             try {
                 Thread.sleep(50);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
             }
             driver.buffer.append("OK\r\n");

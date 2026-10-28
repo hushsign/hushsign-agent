@@ -132,7 +132,7 @@ public final class HourlyCounter {
             long hour;
             try {
                 hour = Long.parseLong(line.substring(0, tab));
-            } catch (NumberFormatException truncated) {
+            } catch (NumberFormatException _) {
                 continue; // a half-written last line after a power cut
             }
             char operation = line.charAt(tab + 1);

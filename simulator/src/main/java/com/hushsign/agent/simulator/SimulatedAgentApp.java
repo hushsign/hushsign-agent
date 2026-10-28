@@ -40,7 +40,9 @@ public final class SimulatedAgentApp {
         String operator = args.length > 1 ? args[1] : "226-10";
         String bootstrap = System.getenv().getOrDefault("HS_KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
         Path workDir = Path.of("target", "sim-agent").toAbsolutePath();
-        LOG.info("workdir={} (user.dir={})", workDir, System.getProperty("user.dir"));
+        if (LOG.isInfoEnabled()) {
+            LOG.info("workdir={} (user.dir={})", workDir, System.getProperty("user.dir"));
+        }
         writePermissivePolicy(workDir);
 
         LOG.info("starting simulated agent: gateway={} operator={} scenario={} broker={}",

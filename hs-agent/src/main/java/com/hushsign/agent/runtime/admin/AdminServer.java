@@ -73,7 +73,9 @@ public final class AdminServer implements AutoCloseable {
         server.createContext("/", admin::dispatch);
         server.setExecutor(executor);
         server.start();
-        LOG.info("admin API listening on {}", settings.describe());
+        if (LOG.isInfoEnabled()) {
+            LOG.info("admin API listening on {}", settings.describe());
+        }
         return admin;
     }
 
@@ -198,7 +200,7 @@ public final class AdminServer implements AutoCloseable {
     private void sendQuietly(HttpExchange exchange, int status, Object body) {
         try {
             send(exchange, status, body);
-        } catch (IOException | RuntimeException ignored) {
+        } catch (IOException | RuntimeException _) {
             // The client went away or the exchange is already spent; nothing left to tell it.
         }
     }

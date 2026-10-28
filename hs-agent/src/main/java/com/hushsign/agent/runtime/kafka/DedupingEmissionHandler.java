@@ -79,7 +79,7 @@ public final class DedupingEmissionHandler implements EmissionHandler {
 
     private void release(String key, EmissionCommand command, Throwable cause) {
         try {
-            if (store.release(key)) {
+            if (store.release(key) && LOG.isWarnEnabled()) {
                 LOG.warn("released dedupe claim for emission {} attempt {} after {}",
                         command.emissionId(), command.attempt(), cause.toString());
             }

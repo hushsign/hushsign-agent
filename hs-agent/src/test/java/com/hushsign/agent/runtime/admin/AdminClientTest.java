@@ -31,7 +31,8 @@ class AdminClientTest {
 
     @Test
     void statusPrintsTheAgentsAnswer() throws Exception {
-        try (AdminServer server = startServer(TOKEN)) {
+        AdminServer server = startServer(TOKEN);
+        try (server) {
             StringBuilder out = new StringBuilder();
             StringBuilder err = new StringBuilder();
 
@@ -44,7 +45,8 @@ class AdminClientTest {
 
     @Test
     void policyReloadIsOneCommand() throws Exception {
-        try (AdminServer server = startServer(TOKEN)) {
+        AdminServer server = startServer(TOKEN);
+        try (server) {
             StringBuilder out = new StringBuilder();
 
             int exit = AdminClient.run(new String[]{"policy", "reload"}, this.workDir, out, new StringBuilder());
@@ -56,7 +58,8 @@ class AdminClientTest {
 
     @Test
     void pauseAndResumeRoundTrip() throws Exception {
-        try (AdminServer server = startServer(TOKEN)) {
+        AdminServer server = startServer(TOKEN);
+        try (server) {
             StringBuilder out = new StringBuilder();
 
             assertEquals(0, AdminClient.run(new String[]{"pause"}, this.workDir, out, new StringBuilder()));
@@ -70,7 +73,8 @@ class AdminClientTest {
 
     @Test
     void aRefusedRequestIsAFailureExit() throws Exception {
-        try (AdminServer server = startServer(TOKEN)) {
+        AdminServer server = startServer(TOKEN);
+        try (server) {
             Files.writeString(this.workDir.resolve(AdminSettings.DEFAULT_TOKEN_FILE), "a-different-token\n",
                     StandardCharsets.UTF_8);
             StringBuilder err = new StringBuilder();

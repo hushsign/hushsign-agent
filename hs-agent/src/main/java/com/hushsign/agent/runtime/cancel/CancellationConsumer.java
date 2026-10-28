@@ -130,7 +130,7 @@ public final class CancellationConsumer implements AutoCloseable {
         while (!closed.get()) {
             try {
                 pollOnce(Duration.ofMillis(500));
-            } catch (WakeupException e) {
+            } catch (WakeupException _) {
                 break;
             } catch (RuntimeException e) {
                 LOG.error("cancellation poll iteration failed; continuing", e);
@@ -188,7 +188,7 @@ public final class CancellationConsumer implements AutoCloseable {
     private static void sleepQuietly(long millis) {
         try {
             Thread.sleep(millis);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         }
     }
@@ -202,7 +202,7 @@ public final class CancellationConsumer implements AutoCloseable {
         if (pollThread != null && pollThread != Thread.currentThread()) {
             try {
                 pollThread.join(2000);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
             }
         }

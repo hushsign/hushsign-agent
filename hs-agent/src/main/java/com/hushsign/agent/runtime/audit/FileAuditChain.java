@@ -215,7 +215,9 @@ public final class FileAuditChain implements AuditLog {
         }
         fileIndex++;
         bytesInFile = 0;
-        LOG.info("audit chain rotated to {} (entry {})", fileName(fileIndex), entry.seq());
+        if (LOG.isInfoEnabled()) {
+            LOG.info("audit chain rotated to {} (entry {})", fileName(fileIndex), entry.seq());
+        }
     }
 
     private void append(Path file, String line) throws IOException {

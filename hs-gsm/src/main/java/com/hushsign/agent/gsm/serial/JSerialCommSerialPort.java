@@ -65,7 +65,7 @@ public final class JSerialCommSerialPort implements SerialPort {
         int read;
         try {
             read = delegate.readBytes(one, 1);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             // jSerialComm surfaces read timeouts as an unchecked exception.
             return -1;
         }

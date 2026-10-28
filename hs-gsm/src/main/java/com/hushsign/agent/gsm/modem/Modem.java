@@ -98,7 +98,7 @@ public final class Modem implements ModemContext, AutoCloseable {
     private void closeQuietly() {
         try {
             driver.closePort();
-        } catch (IOException ignored) {
+        } catch (IOException _) {
             // best effort
         }
     }
@@ -112,7 +112,7 @@ public final class Modem implements ModemContext, AutoCloseable {
                     return last;
                 }
                 driver.clearResponses();
-            } catch (TimeoutException e) {
+            } catch (TimeoutException _) {
                 clearResponsesQuietly();
             } catch (IOException | NumberFormatException e) {
                 throw new ModemException("AT sync failed on " + port.name(), e);
@@ -128,7 +128,7 @@ public final class Modem implements ModemContext, AutoCloseable {
     private void clearResponsesQuietly() {
         try {
             driver.clearResponses();
-        } catch (IOException | NumberFormatException ignored) {
+        } catch (IOException | NumberFormatException _) {
             // best effort
         }
     }

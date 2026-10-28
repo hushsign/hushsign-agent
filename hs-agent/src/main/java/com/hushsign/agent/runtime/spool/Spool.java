@@ -255,14 +255,19 @@ public final class Spool {
                 if (line.isBlank()) {
                     continue;
                 }
-                try {
-                    records.addLast(ProtocolJson.read(line, SpooledRecord.class));
-                } catch (RuntimeException malformed) {
-                    // a torn tail write after a crash: skip it, keep the valid prefix
-                }
+                readOrDrop(line).ifPresent(records::addLast);
             }
         } catch (IOException e) {
             throw new SpoolException("cannot load spool " + file, e);
+        }
+    }
+
+    /** A torn tail write after a crash: skip it, keep the valid prefix. */
+    private static java.util.Optional<SpooledRecord> readOrDrop(String line) {
+        try {
+            return java.util.Optional.of(ProtocolJson.read(line, SpooledRecord.class));
+        } catch (RuntimeException _) {
+            return java.util.Optional.empty();
         }
     }
 
@@ -299,7 +304,7 @@ public final class Spool {
         }
         try {
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+        } catch (java.nio.file.AtomicMoveNotSupportedException _) {
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
         }
     }

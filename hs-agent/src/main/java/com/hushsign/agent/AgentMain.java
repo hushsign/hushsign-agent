@@ -83,7 +83,9 @@ public final class AgentMain {
                 config.gatewayId(), config.operators(), config.modems().pduSubmission());
 
         Modem modem = claimModem(config, new JSerialCommPortFactory());
-        LOG.info("modem claimed: port={} state={}", modem.portName(), modem.state());
+        if (LOG.isInfoEnabled()) {
+            LOG.info("modem claimed: port={} state={}", modem.portName(), modem.state());
+        }
 
         AgentRuntime runtime = AgentRuntime.start(config, configFile, modem,
                 version(AgentMain.class.getPackage().getImplementationVersion()));

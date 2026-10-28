@@ -92,7 +92,7 @@ final class TestSerialPort implements SerialPort {
         if (b != null && dripNanos > 0) {
             try {
                 Thread.sleep(dripNanos / 1_000_000L, (int) (dripNanos % 1_000_000L));
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
             }
         }

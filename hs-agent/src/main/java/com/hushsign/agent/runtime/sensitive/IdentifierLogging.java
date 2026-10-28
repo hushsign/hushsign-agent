@@ -60,7 +60,7 @@ public final class IdentifierLogging {
     public static boolean rawEnabled() {
         try {
             return RAW.equals(configured());
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return false;
         }
     }

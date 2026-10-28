@@ -165,7 +165,7 @@ public final class EmissionConsumer implements AutoCloseable {
         while (!closed.get()) {
             try {
                 pollOnce(Duration.ofMillis(500));
-            } catch (WakeupException e) {
+            } catch (WakeupException _) {
                 // close() asked us to stop
                 break;
             } catch (RuntimeException e) {
@@ -215,8 +215,10 @@ public final class EmissionConsumer implements AutoCloseable {
                     // A misrouted emission must not be sent under another operator:
                     // the transmission would be attributed to the wrong network and
                     // the routing evidence would lie.
-                    LOG.error("discarding emission {} on {}: payload says operator {}",
-                            command.emissionId(), topic(), command.operator());
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("discarding emission {} on {}: payload says operator {}",
+                                command.emissionId(), topic(), command.operator());
+                    }
                     handler.onRejected(raw, RejectReason.INVALID);
                     rejected.incrementAndGet();
                     continue;
@@ -254,7 +256,7 @@ public final class EmissionConsumer implements AutoCloseable {
     private static void sleepQuietly(long millis) {
         try {
             Thread.sleep(millis);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         }
     }
@@ -279,7 +281,7 @@ public final class EmissionConsumer implements AutoCloseable {
         if (pollThread != null && pollThread != Thread.currentThread()) {
             try {
                 pollThread.join(2000);
-            } catch (InterruptedException e) {
+            } catch (InterruptedException _) {
                 Thread.currentThread().interrupt();
             }
         }
