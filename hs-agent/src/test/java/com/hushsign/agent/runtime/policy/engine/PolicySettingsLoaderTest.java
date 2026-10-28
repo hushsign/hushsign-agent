@@ -73,8 +73,9 @@ class PolicySettingsLoaderTest {
 
     @Test
     void aMissingFileIsRefused(@TempDir Path dir) {
+        Path missing = dir.resolve("policy.yaml");
         ConfigException error = assertThrows(ConfigException.class,
-                () -> PolicySettingsLoader.load(dir.resolve("policy.yaml")));
+                () -> PolicySettingsLoader.load(missing));
 
         assertTrue(error.getMessage().contains("refusing to run without a policy"), error.getMessage());
     }

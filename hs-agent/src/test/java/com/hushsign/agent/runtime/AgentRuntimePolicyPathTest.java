@@ -75,7 +75,7 @@ class AgentRuntimePolicyPathTest {
         return AgentConfigLoader.load(EXAMPLE, Map.of());
     }
 
-    private static AgentConfig configWithPolicyPath(String path) throws IOException {
+    private static AgentConfig configWithPolicyPath(String path) {
         AgentConfig base = config();
         return new AgentConfig(base.gatewayId(), base.operators(), base.workDir(), base.kafka(),
                 base.modems(), base.heartbeat(), base.dedupe(), base.spool(),
