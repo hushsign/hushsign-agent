@@ -28,7 +28,7 @@ public final class Topics {
     /** Consumer group prefix used by platform modules: {@code cg-operations}. */
     public static final String MODULE_GROUP_PREFIX = "cg-";
 
-    private static final Pattern OPERATOR = Pattern.compile("^[0-9]{3}-[0-9]{2,3}$");
+    private static final Pattern OPERATOR = Pattern.compile("^\\d{3}-\\d{2,3}$");
 
     private Topics() {
     }

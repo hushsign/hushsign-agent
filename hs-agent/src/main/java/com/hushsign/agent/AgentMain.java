@@ -148,7 +148,7 @@ public final class AgentMain {
      * is reopened with the full init (SIM/PIN, registration, PDU mode) — a modem
      * that cannot read its SIM must never look READY (P1-S14).
      */
-    static Modem claimModem(AgentConfig config, SerialPortFactory factory) throws ModemException, IOException {
+    static Modem claimModem(AgentConfig config, SerialPortFactory factory) throws ModemException {
         ModemConfig modemConfig = modemConfig(config);
         if (!config.modems().autoScan()) {
             for (String port : config.modems().ports()) {

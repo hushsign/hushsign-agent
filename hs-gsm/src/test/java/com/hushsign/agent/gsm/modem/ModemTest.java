@@ -239,7 +239,7 @@ class ModemTest {
     }
 
     @Test
-    void openFailsWithTheSimStatusWhenTheSimCannotBeRead() throws Exception {
+    void openFailsWithTheSimStatusWhenTheSimCannotBeRead() {
         // P1-S14 field spike: the Huawei K3765 answers every SIM command with
         // "+CME ERROR: SIM failure" — the init must fail closed and say why.
         TestSerialPort port = new TestSerialPort("COM3");

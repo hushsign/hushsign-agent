@@ -167,7 +167,7 @@ class AgentConfigLoaderTest {
     }
 
     @Test
-    void invalidValuesAreRejected() throws Exception {
+    void invalidValuesAreRejected() {
         Map<String, String> badOperator = Map.of(
                 "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "abc");
         assertThrows(ConfigException.class, () -> AgentConfigLoader.load(null, badOperator),

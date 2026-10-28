@@ -1,6 +1,7 @@
 package com.hushsign.agent.runtime.sensitive;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -42,7 +43,7 @@ class SensitiveTest {
     @Test
     void equalityIsOnTheRawValue() {
         assertEquals(Sensitive.of("310150123456789"), Sensitive.of("310150123456789"));
-        assertFalse(Sensitive.of("310150123456789").equals(Sensitive.of("310150123456788")));
+        assertNotEquals(Sensitive.of("310150123456789"), Sensitive.of("310150123456788"));
     }
 
     @Test

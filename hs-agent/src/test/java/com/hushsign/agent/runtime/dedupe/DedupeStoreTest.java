@@ -66,25 +66,25 @@ class DedupeStoreTest {
         String id4 = "aaaaaaaa-0000-0000-0000-000000000004";
         DedupeStore store = DedupeStore.open(file(), 3);
 
-        // window {1, 2, 3}
+        // window holds 1, 2, 3
         assertTrue(store.tryClaim(id1));
         assertTrue(store.tryClaim(id2));
         assertTrue(store.tryClaim(id3));
 
-        // claim 4 evicts 1 -> {2, 3, 4}
+        // claiming 4 evicts 1, so the window holds 2, 3, 4
         assertTrue(store.tryClaim(id4));
         assertEquals(3, store.size());
         assertTrue(store.tryClaim(id1), "evicted ids may be claimed again");
         assertEquals(3, store.size());
 
-        // re-claiming 1 evicted 2 -> {3, 4, 1}; claiming 2 evicts 3 -> {4, 1, 2};
-        // claiming 3 evicts 4 -> {1, 2, 3}
+        // re-claiming 1 evicted 2, so the window holds 3, 4, 1; claiming 2 evicts 3, so 4, 1, 2;
+        // claiming 3 evicts 4, so the window holds 1, 2, 3
         assertTrue(store.tryClaim(id2), "id2 left the window when id1 was re-claimed");
         assertEquals(3, store.size());
         assertTrue(store.tryClaim(id3), "id3 left the window when id2 was re-claimed");
         assertEquals(Set.of(id1, id2, id3), store.snapshot(), "claiming id3 evicted id4");
 
-        // the file mirrors the in-memory window after evictions: {1, 2, 3}
+        // the file mirrors the in-memory window after evictions: 1, 2, 3
         DedupeStore reopened = DedupeStore.open(file(), 3);
         assertEquals(Set.of(id1, id2, id3), reopened.snapshot(), "disk matches the window");
         assertTrue(reopened.tryClaim(id4), "the evicted id must be gone from disk too");

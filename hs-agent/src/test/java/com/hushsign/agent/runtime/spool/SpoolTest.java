@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -168,7 +169,7 @@ class SpoolTest {
     }
 
     @Test
-    void aPermanentlyRejectedRecordIsQuarantinedInsteadOfBlockingTheSpool() throws IOException {
+    void aPermanentlyRejectedRecordIsQuarantinedInsteadOfBlockingTheSpool() {
         Spool spool = Spool.open(file());
         enqueue(spool, "t", "poison", "{\"n\":1}");
         enqueue(spool, "t", "k2", "{\"n\":2}");
@@ -255,6 +256,6 @@ class SpoolTest {
 
         release.countDown();
         flusher.join(5000);
-        assertTrue(flusher.isAlive() == false, "the flush finishes once the send returns");
+        assertFalse(flusher.isAlive(), "the flush finishes once the send returns");
     }
 }

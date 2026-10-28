@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
  */
 public final class AgentConfigLoader {
 
-    private static final Pattern OPERATOR = Pattern.compile("^[0-9]{3}-[0-9]{2,3}$");
+    private static final Pattern OPERATOR = Pattern.compile("^\\d{3}-\\d{2,3}$");
 
     private static final Set<String> ROOT_KEYS = Set.of("gatewayId", "operators", "workDir",
             "kafka", "modems", "heartbeat", "dedupe", "spool", "policy");

@@ -19,6 +19,7 @@ import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -107,7 +108,7 @@ class EmissionExecutorTest {
         TransmissionResult result = lastResult();
         assertEquals("FAILED", result.outcome());
         assertEquals("+CMS ERROR: 500", result.failureCause());
-        assertTrue(result.pduSha256() != null); // the attempted PDU is evidence
+        assertNotNull(result.pduSha256(), "the attempted PDU is evidence");
     }
 
     @Test

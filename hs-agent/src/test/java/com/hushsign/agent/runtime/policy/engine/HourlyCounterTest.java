@@ -100,8 +100,8 @@ class HourlyCounterTest {
     void theJournalDoesNotAwardAFreshHourWhenTheClockGoesBackwards(
             @org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) {
         java.nio.file.Path journal = dir.resolve("policy-counters.journal");
-        HourlyCounter counter = new HourlyCounter(clock, journal);
-        counter.incrementAndGet("target:+40700000001");
+        HourlyCounter beforeRestart = new HourlyCounter(clock, journal);
+        beforeRestart.incrementAndGet("target:+40700000001");
         clock.now = Instant.parse("2026-10-27T09:10:00Z");
 
         HourlyCounter rewound = new HourlyCounter(clock, journal);

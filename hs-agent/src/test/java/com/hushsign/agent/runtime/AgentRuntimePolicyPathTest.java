@@ -71,7 +71,7 @@ class AgentRuntimePolicyPathTest {
                 "the message that follows must point at /etc/hs-agent, not at the state directory");
     }
 
-    private static AgentConfig config() throws IOException {
+    private static AgentConfig config() {
         return AgentConfigLoader.load(EXAMPLE, Map.of());
     }
 

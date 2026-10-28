@@ -38,7 +38,7 @@ public final class SimulatorApp {
         System.out.println("== HushSign simulator: " + technique.code() + " -> " + destination
                 + " (scenario " + scenario + ") ==");
         try (Modem modem = Modem.open(sim, config)) {
-            String pduHex = technique.generate(destination, defaultParams(technique));
+            String pduHex = technique.generate(destination, defaultParams());
             System.out.println("PDU: " + pduHex);
             int index = modem.sendPdu(pduHex);
             System.out.println("sent OK, modem message index " + index + ", state " + modem.state());
@@ -53,8 +53,8 @@ public final class SimulatorApp {
         }
     }
 
-    private static TechniqueParams defaultParams(Technique technique) {
-        // P1-S14: the silent-only catalog is parameterless.
+    /** The silent-only catalog carries no parameters (P1-S14), so the parameter names nothing. */
+    private static TechniqueParams defaultParams() {
         return TechniqueParams.None.INSTANCE;
     }
 }
