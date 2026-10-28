@@ -46,7 +46,11 @@ public final class AuditCli {
         Path dir = null;
         Path out = null;
         int count = 20;
-        for (int i = 1; i < args.length; i++) {
+        // A while loop rather than a for: every option here consumes the following argument, so
+        // the index advances by one or two depending on the branch. Hiding that inside a for
+        // header made the reader check the loop counter against the switch on every pass.
+        int i = 1;
+        while (i < args.length) {
             switch (args[i]) {
                 case "--dir" -> {
                     if (i + 1 >= args.length) {
@@ -74,6 +78,7 @@ public final class AuditCli {
                     return 2;
                 }
             }
+            i++;
         }
         if (dir == null) {
             System.err.println("--dir is required (the agent's work directory, or a copy of its audit folder)");
