@@ -29,10 +29,22 @@ class AdminClientTest {
         System.clearProperty("HS_ADMIN_PORT");
     }
 
-    @Test
-    void statusPrintsTheAgentsAnswer() throws Exception {
+    /** Runs one client invocation against a started server and closes it afterwards. */
+    private void withServer(AdminClientBody body) throws Exception {
         AdminServer server = startServer(TOKEN);
         try (server) {
+            body.run();
+        }
+    }
+
+    @FunctionalInterface
+    private interface AdminClientBody {
+        void run() throws Exception;
+    }
+
+    @Test
+    void statusPrintsTheAgentsAnswer() throws Exception {
+        withServer(() -> {
             StringBuilder out = new StringBuilder();
             StringBuilder err = new StringBuilder();
 
@@ -40,26 +52,24 @@ class AdminClientTest {
 
             assertEquals(0, exit, err.toString());
             assertTrue(out.toString().contains("gw-1"));
-        }
+        });
     }
 
     @Test
     void policyReloadIsOneCommand() throws Exception {
-        AdminServer server = startServer(TOKEN);
-        try (server) {
+        withServer(() -> {
             StringBuilder out = new StringBuilder();
 
             int exit = AdminClient.run(new String[]{"policy", "reload"}, this.workDir, out, new StringBuilder());
 
             assertEquals(0, exit);
             assertTrue(out.toString().contains("applied"));
-        }
+        });
     }
 
     @Test
     void pauseAndResumeRoundTrip() throws Exception {
-        AdminServer server = startServer(TOKEN);
-        try (server) {
+        withServer(() -> {
             StringBuilder out = new StringBuilder();
 
             assertEquals(0, AdminClient.run(new String[]{"pause"}, this.workDir, out, new StringBuilder()));
@@ -68,13 +78,12 @@ class AdminClientTest {
             out.setLength(0);
             assertEquals(0, AdminClient.run(new String[]{"resume"}, this.workDir, out, new StringBuilder()));
             assertTrue(out.toString().contains("\"paused\":false"));
-        }
+        });
     }
 
     @Test
     void aRefusedRequestIsAFailureExit() throws Exception {
-        AdminServer server = startServer(TOKEN);
-        try (server) {
+        withServer(() -> {
             Files.writeString(this.workDir.resolve(AdminSettings.DEFAULT_TOKEN_FILE), "a-different-token\n",
                     StandardCharsets.UTF_8);
             StringBuilder err = new StringBuilder();
@@ -83,7 +92,7 @@ class AdminClientTest {
 
             assertEquals(1, exit);
             assertTrue(err.toString().contains("401"), err.toString());
-        }
+        });
     }
 
     @Test
