@@ -3,7 +3,6 @@ package com.hushsign.agent.simulator;
 import com.hushsign.agent.gsm.modem.Modem;
 import com.hushsign.agent.gsm.modem.ModemConfig;
 import com.hushsign.agent.gsm.modem.ModemException;
-import com.hushsign.agent.gsm.modem.ModemState;
 import com.hushsign.agent.technique.Technique;
 import com.hushsign.agent.technique.TechniqueParams;
 

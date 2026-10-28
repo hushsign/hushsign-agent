@@ -5,7 +5,6 @@ import com.hushsign.agent.gsm.modem.ModemConfig;
 import com.hushsign.agent.gsm.modem.ModemException;
 import com.hushsign.agent.gsm.modem.ModemState;
 import com.hushsign.agent.technique.Technique;
-import com.hushsign.agent.technique.TechniqueParams;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

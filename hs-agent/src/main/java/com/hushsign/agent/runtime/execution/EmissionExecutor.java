@@ -4,7 +4,6 @@ import com.hushsign.agent.runtime.kafka.EmissionConsumer;
 import com.hushsign.agent.runtime.kafka.EmissionHandler;
 import com.hushsign.agent.runtime.transmission.TransmissionProducer;
 import com.hushsign.agent.technique.Technique;
-import com.hushsign.agent.technique.TechniqueParams;
 import com.hushsign.protocol.ProtocolJson;
 import com.hushsign.protocol.v1.EmissionCommand;
 import com.hushsign.protocol.v1.TransmissionResult;

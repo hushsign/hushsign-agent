@@ -3,7 +3,6 @@ package com.hushsign.agent.runtime.kafka;
 import com.hushsign.agent.config.AgentConfig;
 import com.hushsign.protocol.CommandValidator;
 import com.hushsign.protocol.ProtocolJson;
-import com.hushsign.protocol.Topics;
 import com.hushsign.protocol.v1.EmissionCommand;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
