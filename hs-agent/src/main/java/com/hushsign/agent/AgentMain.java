@@ -88,7 +88,7 @@ public final class AgentMain {
         AgentRuntime runtime = AgentRuntime.start(config, configFile, modem,
                 version(AgentMain.class.getPackage().getImplementationVersion()));
         if (rawIdentifiers) {
-            runtime.auditLog().record("STARTUP", null,
+            runtime.auditLog().append("STARTUP", null,
                     "log identifiers = raw: agent.log carries subscriber identifiers in clear");
         }
         Optional<AdminServer> adminServer = startAdminServer(config, runtime);

@@ -90,10 +90,6 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
     private final Instant startedAt = Instant.now();
     private final AtomicBoolean flusherRunning = new AtomicBoolean();
     private final AtomicBoolean heartbeatRunning = new AtomicBoolean();
-    private Thread flusher;
-    private Thread heartbeatThread;
-    private Thread digestThread;
-    private Thread shutdownHook;
 
     private AgentRuntime(String gatewayId, Spool spool, KafkaSpoolSender sender,
                          List<EmissionConsumer> consumers, CancellationConsumer cancellationConsumer,
@@ -211,7 +207,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
      * is short so a digest goes out within a minute of the hour rather than at the next restart.
      */
     private void startDigests() {
-        digestThread = new Thread(() -> {
+        Thread digestThread = new Thread(() -> {
             while (!closed.get() && !Thread.currentThread().isInterrupted()) {
                 try {
                     digests.pulse().ifPresent(digest -> LOG.info(
@@ -232,7 +228,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         if (!flusherRunning.compareAndSet(false, true)) {
             return;
         }
-        flusher = new Thread(() -> {
+        Thread flusher = new Thread(() -> {
             while (!closed.get() && !Thread.currentThread().isInterrupted()) {
                 flushOnce();
                 sleepQuietly(1000);
@@ -261,7 +257,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         if (!heartbeatRunning.compareAndSet(false, true)) {
             return;
         }
-        heartbeatThread = new Thread(() -> {
+        Thread heartbeatThread = new Thread(() -> {
             while (!closed.get() && !Thread.currentThread().isInterrupted()) {
                 try {
                     heartbeat.pulse();
@@ -276,7 +272,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
     }
 
     private void installShutdownHook() {
-        shutdownHook = new Thread(this::close, "hs-agent-shutdown");
+        Thread shutdownHook = new Thread(this::close, "hs-agent-shutdown");
         try {
             Runtime.getRuntime().addShutdownHook(shutdownHook);
         } catch (IllegalStateException e) {
