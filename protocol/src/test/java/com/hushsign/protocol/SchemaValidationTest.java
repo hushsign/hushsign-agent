@@ -1,7 +1,7 @@
 package com.hushsign.protocol;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -120,6 +120,30 @@ class SchemaValidationTest {
         ObjectNode node = (ObjectNode) ProtocolJson.tree(
                 GoldenPayloads.load("emission-command.json"));
         node.put("msisdn", "phone:+40 722 111 222");
+        assertThrows(ProtocolValidationException.class,
+                () -> validator.validate(MessageType.EMISSION_COMMAND, node));
+    }
+
+    @Test
+    void aDateThatIsNotAnInstantIsRejected() {
+        // Format assertions are what make "date-time" mean something; Draft 2020-12 treats
+        // format as an annotation unless asked otherwise. Pinned because the validator
+        // underneath changed (networknt 1.5.6 -> 3.0.8) and a silent switch to
+        // annotation-only would let a timestamp of any shape through.
+        ObjectNode node = (ObjectNode) ProtocolJson.tree(
+                GoldenPayloads.load("emission-command.json"));
+        node.put("issuedAt", "yesterday");
+        assertThrows(ProtocolValidationException.class,
+                () -> validator.validate(MessageType.EMISSION_COMMAND, node));
+    }
+
+    @Test
+    void anIntegerGivenAsAStringIsRejected() {
+        // Type strictness, for the same reason: a lenient parser would accept "1" where the
+        // schema says integer, and the agent would then have to guess.
+        ObjectNode node = (ObjectNode) ProtocolJson.tree(
+                GoldenPayloads.load("emission-command.json"));
+        node.put("attempt", "1");
         assertThrows(ProtocolValidationException.class,
                 () -> validator.validate(MessageType.EMISSION_COMMAND, node));
     }
