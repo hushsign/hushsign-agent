@@ -50,7 +50,7 @@ class AgentRuntimePolicyPathTest {
     }
 
     @Test
-    void anAbsolutePathIsTakenAsWritten() throws IOException {
+    void anAbsolutePathIsTakenAsWritten() {
         Path elsewhere = this.tempDir.resolve("elsewhere").resolve("rules.yaml");
         AgentConfig config = configWithPolicyPath(elsewhere.toString());
 

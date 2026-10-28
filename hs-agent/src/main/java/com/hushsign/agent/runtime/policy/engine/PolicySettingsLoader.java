@@ -46,8 +46,11 @@ public final class PolicySettingsLoader {
     /** The only key either list section accepts, and the one an operator most often misspells. */
     private static final String KEY_ALLOW = "allow";
 
+    /** The one section that decides when it is too late at night to send. */
+    private static final String KEY_QUIET_HOURS = "quietHours";
+
     private static final Set<String> ROOT_KEYS =
-            Set.of("killSwitch", "techniques", "operators", "caps", "quietHours", "commands", "visibleSms");
+            Set.of("killSwitch", "techniques", "operators", "caps", KEY_QUIET_HOURS, "commands", "visibleSms");
     private static final Set<String> TECHNIQUE_KEYS = Set.of(KEY_ALLOW);
     private static final Set<String> OPERATOR_KEYS = Set.of(KEY_ALLOW);
     private static final Set<String> CAP_KEYS = Set.of("perTargetPerHour", "perOperatorPerHour", "perGatewayPerHour");
@@ -100,10 +103,10 @@ public final class PolicySettingsLoader {
     }
 
     private static PolicySettings.QuietHours quietHours(Map<String, Object> root, String where) {
-        if (!root.containsKey("quietHours")) {
+        if (!root.containsKey(KEY_QUIET_HOURS)) {
             return null;
         }
-        Map<String, Object> quiet = section(root, "quietHours", where);
+        Map<String, Object> quiet = section(root, KEY_QUIET_HOURS, where);
         checkKeys(quiet, QUIET_KEYS, "quietHours.", where);
         LocalTime start = time(quiet.get("start"), "quietHours.start", where);
         LocalTime end = time(quiet.get("end"), "quietHours.end", where);

@@ -46,9 +46,11 @@ public final class AgentConfigLoader {
     private static final String SECURITY_PREFIX = "kafka.security.";
     private static final String MODEMS_PREFIX = "modems.";
     private static final String SPOOL_PREFIX = "spool.";
+    /** Where the spool lives unless the file says otherwise. */
+    private static final String DEFAULT_SPOOL_DIR = "spool";
 
     private static final Set<String> ROOT_KEYS = Set.of("gatewayId", "operators", "workDir",
-            "kafka", "modems", "heartbeat", "dedupe", "spool", "policy");
+            "kafka", "modems", "heartbeat", "dedupe", DEFAULT_SPOOL_DIR, "policy");
     private static final Set<String> KAFKA_KEYS = Set.of("bootstrapServers", "clientId", "security");
     private static final Set<String> SECURITY_KEYS = Set.of("protocol", "saslMechanism",
             "saslUsername", "saslPassword", "truststorePath", "truststorePassword");
@@ -159,14 +161,14 @@ public final class AgentConfigLoader {
         DedupeConfig dedupeConfig = new DedupeConfig(
                 positive(intVal(dedupe, "dedupe.", "maxEntries", env, 10_000), "dedupe.maxEntries"));
 
-        Map<String, Object> spool = section(root, "spool");
+        Map<String, Object> spool = section(root, DEFAULT_SPOOL_DIR);
         checkKeys(spool, SPOOL_KEYS, SPOOL_PREFIX);
         long spoolMaxBytes = longVal(spool, SPOOL_PREFIX, "maxBytes", env, 64L * 1024 * 1024);
         if (spoolMaxBytes < 1) {
             throw new ConfigException("spool.maxBytes must be >= 1, got " + spoolMaxBytes);
         }
         SpoolConfig spoolConfig = new SpoolConfig(
-                str(spool, SPOOL_PREFIX, "path", env, "spool"), spoolMaxBytes);
+                str(spool, SPOOL_PREFIX, "path", env, DEFAULT_SPOOL_DIR), spoolMaxBytes);
 
         Map<String, Object> policy = section(root, "policy");
         checkKeys(policy, POLICY_KEYS, "policy.");
