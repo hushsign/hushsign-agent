@@ -1,6 +1,6 @@
 package com.hushsign.agent.runtime.admin;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.hushsign.agent.runtime.audit.AuditLog;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;

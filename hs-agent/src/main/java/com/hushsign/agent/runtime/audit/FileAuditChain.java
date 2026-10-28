@@ -1,7 +1,7 @@
 package com.hushsign.agent.runtime.audit;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.channels.FileChannel;
@@ -284,7 +284,7 @@ public final class FileAuditChain implements AuditLog {
         return node;
     }
 
-    private static AuditEntry fromJson(com.fasterxml.jackson.databind.JsonNode node) {
+    private static AuditEntry fromJson(tools.jackson.databind.JsonNode node) {
         return new AuditEntry(
                 node.path("seq").asLong(),
                 Instant.parse(node.path("at").asText()),
