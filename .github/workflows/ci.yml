@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - name: Set up Java 21
@@ -31,7 +31,7 @@ jobs:
         run: ./mvnw -B verify --no-transfer-progress
 
   protocol-schemas:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build
     steps:
       - uses: actions/checkout@v5
@@ -41,7 +41,7 @@ jobs:
   audit-tamper:
     # P7-S10: the audit chain is the device's evidence, so "it detects tampering" is a gate of
     # its own rather than a case inside the general suite, where a refactor could drop it.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build
     steps:
       - uses: actions/checkout@v5
@@ -65,7 +65,7 @@ jobs:
   protocol-drift:
     # Not on push: see the note under `schedule`. This job cannot be green from one side alone.
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build
     steps:
       - uses: actions/checkout@v5
