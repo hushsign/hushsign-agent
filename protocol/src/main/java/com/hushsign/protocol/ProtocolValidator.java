@@ -30,8 +30,9 @@ public final class ProtocolValidator {
     public ProtocolValidator() {
         // Draft 2020-12 treats "format" as an annotation by default; the wire
         // protocol requires assertion (uuid, date-time, regexes must be checked).
-        SchemaValidatorsConfig config = new SchemaValidatorsConfig();
-        config.setFormatAssertionsEnabled(true);
+        SchemaValidatorsConfig config = SchemaValidatorsConfig.builder()
+                .formatAssertionsEnabled(true)
+                .build();
         JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
         for (MessageType type : MessageType.values()) {
             String resource = SCHEMA_BASE + type.schemaName();

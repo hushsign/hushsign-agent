@@ -7,6 +7,7 @@ import com.hushsign.protocol.v1.EmissionCommand;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.MockConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +41,11 @@ class EmissionConsumerTest {
     private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
     private final TopicPartition tp0 = new TopicPartition(TOPIC, 0);
+
+    /** MockConsumer.committed(TopicPartition) is deprecated in favour of the Map-returning one. */
+    private static OffsetAndMetadata committed(MockConsumer<String, String> consumer, TopicPartition tp) {
+        return consumer.committed(Set.of(tp)).get(tp);
+    }
     private MockConsumer<String, String> kafka;
     private List<EmissionCommand> commands;
     private List<String> rejectedPayloads;
@@ -100,7 +106,7 @@ class EmissionConsumerTest {
         assertEquals("5c9f7a2e-66f1-4b1f-9e7f-1f2a3b4c5d6e", commands.get(0).emissionId());
         assertEquals(1, consumer.deliveredCount());
         assertEquals(0, rejectedPayloads.size());
-        assertEquals(1L, kafka.committed(tp0).offset(), "batch must be committed after handling");
+        assertEquals(1L, committed(kafka, tp0).offset(), "batch must be committed after handling");
     }
 
     @Test
@@ -124,7 +130,7 @@ class EmissionConsumerTest {
         assertEquals(List.of(stale), rejectedPayloads);
         assertEquals(List.of(EmissionConsumer.RejectReason.STALE), rejectedReasons);
         assertEquals(1, consumer.rejectedCount());
-        assertEquals(1L, kafka.committed(tp0).offset(), "rejections are terminal and committed");
+        assertEquals(1L, committed(kafka, tp0).offset(), "rejections are terminal and committed");
     }
 
     @Test
@@ -165,7 +171,7 @@ class EmissionConsumerTest {
         assertEquals(1, consumer.pollOnce(Duration.ZERO));
         assertEquals(0, consumer.deliveredCount(), "a misrouted emission must never be sent");
         assertEquals(List.of(EmissionConsumer.RejectReason.INVALID), rejectedReasons);
-        assertEquals(1L, kafka.committed(tp0).offset(), "the rejection is terminal");
+        assertEquals(1L, committed(kafka, tp0).offset(), "the rejection is terminal");
     }
 
     @Test
@@ -174,7 +180,7 @@ class EmissionConsumerTest {
         deliver(json, 0);
 
         assertEquals(1, consumer.pollOnce(Duration.ZERO));
-        assertNull(kafka.committed(tp0), "no commit after a handler failure");
+        assertNull(committed(kafka, tp0), "no commit after a handler failure");
         assertEquals(0, consumer.deliveredCount());
         assertEquals(0L, kafka.position(tp0),
                 "the consumer must rewind to the failed offset (otherwise the record is lost until restart)");
@@ -183,7 +189,7 @@ class EmissionConsumerTest {
         deliver(json, 0);
         assertEquals(1, consumer.pollOnce(Duration.ZERO));
         assertEquals(1, commands.size(), "the failed record must be retried in-process");
-        assertEquals(1L, kafka.committed(tp0).offset());
+        assertEquals(1L, committed(kafka, tp0).offset());
     }
 
     @Test

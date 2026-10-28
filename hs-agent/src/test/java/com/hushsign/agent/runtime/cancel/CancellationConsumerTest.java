@@ -8,6 +8,7 @@ import com.hushsign.protocol.v1.EmissionCancelled;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.MockConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +41,11 @@ class CancellationConsumerTest {
     private static final String ID = "5c9f7a2e-66f1-4b1f-9e7f-1f2a3b4c5d6e";
 
     private final TopicPartition tp0 = new TopicPartition(Topics.EMISSIONS_CANCELLED, 0);
+
+    /** MockConsumer.committed(TopicPartition) is deprecated in favour of the Map-returning one. */
+    private static OffsetAndMetadata committed(MockConsumer<String, String> consumer, TopicPartition tp) {
+        return consumer.committed(Set.of(tp)).get(tp);
+    }
 
     @TempDir
     Path tempDir;
@@ -89,7 +95,7 @@ class CancellationConsumerTest {
         assertEquals(1, consumer.pollOnce(Duration.ZERO));
         assertTrue(store.isCancelled(ID));
         assertEquals(1, consumer.appliedCount());
-        assertEquals(1L, kafka.committed(tp0).offset());
+        assertEquals(1L, committed(kafka, tp0).offset());
     }
 
     @Test
@@ -99,7 +105,7 @@ class CancellationConsumerTest {
         assertEquals(1, consumer.pollOnce(Duration.ZERO));
         assertFalse(store.isCancelled(ID), "a stale cancellation cannot be trusted");
         assertEquals(1, consumer.refusedCount());
-        assertEquals(1L, kafka.committed(tp0).offset(), "refusals are terminal");
+        assertEquals(1L, committed(kafka, tp0).offset(), "refusals are terminal");
     }
 
     @Test
