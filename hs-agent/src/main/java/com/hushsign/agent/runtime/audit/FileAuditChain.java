@@ -43,6 +43,10 @@ import org.slf4j.LoggerFactory;
  */
 public final class FileAuditChain implements AuditLog {
 
+    /** Wire names of the JSONL fields: one spelling for writing and for reading back. */
+    private static final String FIELD_EMISSION_ID = "emissionId";
+    private static final String FIELD_DETAIL = "detail";
+
     private static final Logger LOG = LoggerFactory.getLogger(FileAuditChain.class);
     private static final Pattern FILE_NAME = Pattern.compile("audit-(\\d{4})\\.jsonl");
 
@@ -273,8 +277,8 @@ public final class FileAuditChain implements AuditLog {
         node.put("at", entry.at().toString());
         node.put("gatewayId", entry.gatewayId());
         node.put("type", entry.type());
-        node.put("emissionId", entry.emissionId());
-        node.put("detail", entry.detail());
+        node.put(FIELD_EMISSION_ID, entry.emissionId());
+        node.put(FIELD_DETAIL, entry.detail());
         node.put("prevHash", entry.prevHash());
         node.put("hash", entry.hash());
         return node;
@@ -286,8 +290,8 @@ public final class FileAuditChain implements AuditLog {
                 Instant.parse(node.path("at").asText()),
                 node.path("gatewayId").asText(),
                 node.path("type").asText(),
-                node.hasNonNull("emissionId") ? node.get("emissionId").asText() : null,
-                node.hasNonNull("detail") ? node.get("detail").asText() : null,
+                node.hasNonNull(FIELD_EMISSION_ID) ? node.get(FIELD_EMISSION_ID).asText() : null,
+                node.hasNonNull(FIELD_DETAIL) ? node.get(FIELD_DETAIL).asText() : null,
                 node.path("prevHash").asText(),
                 node.path("hash").asText());
     }

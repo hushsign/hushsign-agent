@@ -39,6 +39,14 @@ public final class AgentConfigLoader {
 
     private static final Pattern OPERATOR = Pattern.compile("^\\d{3}-\\d{2,3}$");
 
+    // The section prefixes. Each appears once per key, inside the message an operator reads
+    // when a key is wrong, so one constant per section keeps the eleven `modems.` messages
+    // from drifting apart.
+    private static final String KAFKA_PREFIX = "kafka.";
+    private static final String SECURITY_PREFIX = "kafka.security.";
+    private static final String MODEMS_PREFIX = "modems.";
+    private static final String SPOOL_PREFIX = "spool.";
+
     private static final Set<String> ROOT_KEYS = Set.of("gatewayId", "operators", "workDir",
             "kafka", "modems", "heartbeat", "dedupe", "spool", "policy");
     private static final Set<String> KAFKA_KEYS = Set.of("bootstrapServers", "clientId", "security");
@@ -108,37 +116,37 @@ public final class AgentConfigLoader {
         String workDir = str(root, "", "workDir", env, ".");
 
         Map<String, Object> kafka = section(root, "kafka");
-        checkKeys(kafka, KAFKA_KEYS, "kafka.");
+        checkKeys(kafka, KAFKA_KEYS, KAFKA_PREFIX);
         Map<String, Object> security = section(kafka, "security");
-        checkKeys(security, SECURITY_KEYS, "kafka.security.");
+        checkKeys(security, SECURITY_KEYS, SECURITY_PREFIX);
         KafkaConfig kafkaConfig = new KafkaConfig(
-                str(kafka, "kafka.", "bootstrapServers", env, "localhost:9092"),
-                str(kafka, "kafka.", "clientId", env, null),
+                str(kafka, KAFKA_PREFIX, "bootstrapServers", env, "localhost:9092"),
+                str(kafka, KAFKA_PREFIX, "clientId", env, null),
                 new SecurityConfig(
-                        str(security, "kafka.security.", "protocol", env, "PLAINTEXT"),
-                        str(security, "kafka.security.", "saslMechanism", env, null),
-                        str(security, "kafka.security.", "saslUsername", env, null),
-                        str(security, "kafka.security.", "saslPassword", env, null),
-                        str(security, "kafka.security.", "truststorePath", env, null),
-                        str(security, "kafka.security.", "truststorePassword", env, null)));
+                        str(security, SECURITY_PREFIX, "protocol", env, "PLAINTEXT"),
+                        str(security, SECURITY_PREFIX, "saslMechanism", env, null),
+                        str(security, SECURITY_PREFIX, "saslUsername", env, null),
+                        str(security, SECURITY_PREFIX, "saslPassword", env, null),
+                        str(security, SECURITY_PREFIX, "truststorePath", env, null),
+                        str(security, SECURITY_PREFIX, "truststorePassword", env, null)));
 
         Map<String, Object> modems = section(root, "modems");
-        checkKeys(modems, MODEMS_KEYS, "modems.");
-        boolean autoScan = bool(modems, "modems.", "autoScan", env, true);
-        List<String> ports = strList(modems, "modems.", "ports", env, List.of());
+        checkKeys(modems, MODEMS_KEYS, MODEMS_PREFIX);
+        boolean autoScan = bool(modems, MODEMS_PREFIX, "autoScan", env, true);
+        List<String> ports = strList(modems, MODEMS_PREFIX, "ports", env, List.of());
         if (!autoScan && ports.isEmpty()) {
             throw new ConfigException("modems.autoScan is false but modems.ports is empty");
         }
         ModemsConfig modemsConfig = new ModemsConfig(
                 autoScan,
                 ports,
-                positive(intVal(modems, "modems.", "baudRate", env, 115_200), "modems.baudRate"),
-                positive(intVal(modems, "modems.", "responseTimeoutMs", env, 30_000), "modems.responseTimeoutMs"),
-                nonNegative(intVal(modems, "modems.", "commandWaitMs", env, 700), "modems.commandWaitMs"),
-                positive(intVal(modems, "modems.", "pollWaitMs", env, 200), "modems.pollWaitMs"),
-                positive(intVal(modems, "modems.", "probeAttempts", env, 3), "modems.probeAttempts"),
-                positive(intVal(modems, "modems.", "maxConsecutiveErrors", env, 3), "modems.maxConsecutiveErrors"),
-                str(modems, "modems.", "simPin", env, null),
+                positive(intVal(modems, MODEMS_PREFIX, "baudRate", env, 115_200), "modems.baudRate"),
+                positive(intVal(modems, MODEMS_PREFIX, "responseTimeoutMs", env, 30_000), "modems.responseTimeoutMs"),
+                nonNegative(intVal(modems, MODEMS_PREFIX, "commandWaitMs", env, 700), "modems.commandWaitMs"),
+                positive(intVal(modems, MODEMS_PREFIX, "pollWaitMs", env, 200), "modems.pollWaitMs"),
+                positive(intVal(modems, MODEMS_PREFIX, "probeAttempts", env, 3), "modems.probeAttempts"),
+                positive(intVal(modems, MODEMS_PREFIX, "maxConsecutiveErrors", env, 3), "modems.maxConsecutiveErrors"),
+                str(modems, MODEMS_PREFIX, "simPin", env, null),
                 pduSubmission(modems, env));
 
         Map<String, Object> heartbeat = section(root, "heartbeat");
@@ -152,13 +160,13 @@ public final class AgentConfigLoader {
                 positive(intVal(dedupe, "dedupe.", "maxEntries", env, 10_000), "dedupe.maxEntries"));
 
         Map<String, Object> spool = section(root, "spool");
-        checkKeys(spool, SPOOL_KEYS, "spool.");
-        long spoolMaxBytes = longVal(spool, "spool.", "maxBytes", env, 64L * 1024 * 1024);
+        checkKeys(spool, SPOOL_KEYS, SPOOL_PREFIX);
+        long spoolMaxBytes = longVal(spool, SPOOL_PREFIX, "maxBytes", env, 64L * 1024 * 1024);
         if (spoolMaxBytes < 1) {
             throw new ConfigException("spool.maxBytes must be >= 1, got " + spoolMaxBytes);
         }
         SpoolConfig spoolConfig = new SpoolConfig(
-                str(spool, "spool.", "path", env, "spool"), spoolMaxBytes);
+                str(spool, SPOOL_PREFIX, "path", env, "spool"), spoolMaxBytes);
 
         Map<String, Object> policy = section(root, "policy");
         checkKeys(policy, POLICY_KEYS, "policy.");
@@ -295,7 +303,7 @@ public final class AgentConfigLoader {
      * {@code +CMS ERROR: 304}). Defaults to the standard form.
      */
     private static String pduSubmission(Map<String, Object> modems, Map<String, String> env) {
-        String value = str(modems, "modems.", "pduSubmission", env, "FULL_HEX");
+        String value = str(modems, MODEMS_PREFIX, "pduSubmission", env, "FULL_HEX");
         String normalized = value.trim().toUpperCase(Locale.ROOT);
         if (!ModemsConfig.PDU_SUBMISSIONS.contains(normalized)) {
             throw new ConfigException("modems.pduSubmission must be one of "

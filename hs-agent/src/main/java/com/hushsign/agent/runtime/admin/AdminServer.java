@@ -41,6 +41,9 @@ public final class AdminServer implements AutoCloseable {
     private static final long DENIAL_AUDIT_INTERVAL_MS = 60_000;
 
     private final HttpServer server;
+    /** The one field every error body carries; the local client reads it by this name. */
+    private static final String JSON_ERROR = "error";
+
     private final ExecutorService executor;
     private final AdminRuntime runtime;
     private final AuditLog audit;
@@ -109,13 +112,13 @@ public final class AdminServer implements AutoCloseable {
                 case "/pause" -> mutate(method, exchange, () -> changed(this.runtime.pause(), "pause", exchange));
                 case "/resume" -> mutate(method, exchange, () -> changed(this.runtime.resume(), "resume", exchange));
                 case "/kill" -> mutate(method, exchange, () -> changed(this.runtime.kill(), "kill", exchange));
-                default -> send(exchange, 404, Map.of("error", "no such endpoint: " + path));
+                default -> send(exchange, 404, Map.of(JSON_ERROR, "no such endpoint: " + path));
             }
         } catch (IOException e) {
             LOG.warn("admin request failed: {}", e.toString());
         } catch (RuntimeException e) {
             LOG.warn("admin request failed: {}", e.toString());
-            sendQuietly(exchange, 500, Map.of("error", String.valueOf(e.getMessage())));
+            sendQuietly(exchange, 500, Map.of(JSON_ERROR, String.valueOf(e.getMessage())));
         } finally {
             exchange.close();
         }
@@ -145,7 +148,7 @@ public final class AdminServer implements AutoCloseable {
 
     private void read(String method, HttpExchange exchange, Body body) throws IOException {
         if (!"GET".equals(method)) {
-            send(exchange, 405, Map.of("error", "use GET"));
+            send(exchange, 405, Map.of(JSON_ERROR, "use GET"));
             return;
         }
         send(exchange, 200, body.value());
@@ -153,7 +156,7 @@ public final class AdminServer implements AutoCloseable {
 
     private void mutate(String method, HttpExchange exchange, Body body) throws IOException {
         if (!"POST".equals(method)) {
-            send(exchange, 405, Map.of("error", "use POST"));
+            send(exchange, 405, Map.of(JSON_ERROR, "use POST"));
             return;
         }
         send(exchange, 200, body.value());
@@ -180,7 +183,7 @@ public final class AdminServer implements AutoCloseable {
                     "bad or missing token from " + exchange.getRemoteAddress());
         }
         LOG.warn("admin request refused from {}: bad or missing token", exchange.getRemoteAddress());
-        send(exchange, 401, Map.of("error", "a bearer token is required"));
+        send(exchange, 401, Map.of(JSON_ERROR, "a bearer token is required"));
     }
 
     private void send(HttpExchange exchange, int status, Object body) throws IOException {

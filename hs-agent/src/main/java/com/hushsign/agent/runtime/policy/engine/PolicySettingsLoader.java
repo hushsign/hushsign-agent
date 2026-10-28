@@ -43,10 +43,13 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  */
 public final class PolicySettingsLoader {
 
+    /** The only key either list section accepts, and the one an operator most often misspells. */
+    private static final String KEY_ALLOW = "allow";
+
     private static final Set<String> ROOT_KEYS =
             Set.of("killSwitch", "techniques", "operators", "caps", "quietHours", "commands", "visibleSms");
-    private static final Set<String> TECHNIQUE_KEYS = Set.of("allow");
-    private static final Set<String> OPERATOR_KEYS = Set.of("allow");
+    private static final Set<String> TECHNIQUE_KEYS = Set.of(KEY_ALLOW);
+    private static final Set<String> OPERATOR_KEYS = Set.of(KEY_ALLOW);
     private static final Set<String> CAP_KEYS = Set.of("perTargetPerHour", "perOperatorPerHour", "perGatewayPerHour");
     private static final Set<String> QUIET_KEYS = Set.of("start", "end", "zone");
     private static final Set<String> COMMAND_KEYS = Set.of("maxAgeSeconds");
@@ -76,11 +79,11 @@ public final class PolicySettingsLoader {
 
         Map<String, Object> techniques = section(root, "techniques", where);
         checkKeys(techniques, TECHNIQUE_KEYS, "techniques.", where);
-        Set<String> allowedTechniques = strings(techniques.get("allow"), "techniques.allow", where);
+        Set<String> allowedTechniques = strings(techniques.get(KEY_ALLOW), "techniques.allow", where);
 
         Map<String, Object> operators = section(root, "operators", where);
         checkKeys(operators, OPERATOR_KEYS, "operators.", where);
-        Set<String> allowedOperators = strings(operators.get("allow"), "operators.allow", where);
+        Set<String> allowedOperators = strings(operators.get(KEY_ALLOW), "operators.allow", where);
 
         Map<String, Object> caps = section(root, "caps", where);
         checkKeys(caps, CAP_KEYS, "caps.", where);

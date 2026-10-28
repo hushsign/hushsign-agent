@@ -31,6 +31,13 @@ import java.util.Set;
  */
 public record AdminSettings(InetAddress bindAddress, int port, String token, Path tokenFile) {
 
+    /** The environment variable that carries the port; 0 switches the API off. */
+    static final String ENV_PORT = "HS_ADMIN_PORT";
+
+    /** Loopback only. A remote admin surface is a different product with a different threat
+     * model, so there is deliberately no way to bind another address. */
+    static final String LOOPBACK = "127.0.0.1";
+
     public static final int DEFAULT_PORT = 9099;
 
     public static final String DEFAULT_TOKEN_FILE = "admin.token";
@@ -43,7 +50,7 @@ public record AdminSettings(InetAddress bindAddress, int port, String token, Pat
      * @return empty when the API is switched off with {@code HS_ADMIN_PORT=0}
      */
     public static Optional<AdminSettings> resolve(Path workDir) throws IOException {
-        int port = intFromEnvironment("HS_ADMIN_PORT", DEFAULT_PORT);
+        int port = intFromEnvironment(ENV_PORT, DEFAULT_PORT);
         if (port <= 0) {
             return Optional.empty();
         }
@@ -52,7 +59,7 @@ public record AdminSettings(InetAddress bindAddress, int port, String token, Pat
         String token = configuredToken == null || configuredToken.isBlank()
                 ? loadOrCreateToken(tokenFile)
                 : configuredToken.trim();
-        return Optional.of(new AdminSettings(InetAddress.getByName("127.0.0.1"), port, token, tokenFile));
+        return Optional.of(new AdminSettings(InetAddress.getByName(LOOPBACK), port, token, tokenFile));
     }
 
     /**
@@ -62,14 +69,14 @@ public record AdminSettings(InetAddress bindAddress, int port, String token, Pat
      * @return empty when the API is off, or when no token exists yet to authenticate with
      */
     public static Optional<AdminSettings> locate(Path workDir) throws IOException {
-        int port = intFromEnvironment("HS_ADMIN_PORT", DEFAULT_PORT);
+        int port = intFromEnvironment(ENV_PORT, DEFAULT_PORT);
         if (port <= 0) {
             return Optional.empty();
         }
         Path tokenFile = tokenFile(workDir);
         String configuredToken = environment("HS_ADMIN_TOKEN", null);
         if (configuredToken != null && !configuredToken.isBlank()) {
-            return Optional.of(new AdminSettings(InetAddress.getByName("127.0.0.1"), port,
+            return Optional.of(new AdminSettings(InetAddress.getByName(LOOPBACK), port,
                     configuredToken.trim(), tokenFile));
         }
         if (!Files.isReadable(tokenFile)) {
@@ -79,12 +86,12 @@ public record AdminSettings(InetAddress bindAddress, int port, String token, Pat
         if (stored.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(new AdminSettings(InetAddress.getByName("127.0.0.1"), port, stored, tokenFile));
+        return Optional.of(new AdminSettings(InetAddress.getByName(LOOPBACK), port, stored, tokenFile));
     }
 
     /** The port the API would use, without touching the token. */
     public static int configuredPort() {
-        return intFromEnvironment("HS_ADMIN_PORT", DEFAULT_PORT);
+        return intFromEnvironment(ENV_PORT, DEFAULT_PORT);
     }
 
     private static Path tokenFile(Path workDir) {
