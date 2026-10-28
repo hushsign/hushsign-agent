@@ -21,11 +21,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Set up Java 21
+      - name: Set up Java 25
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
           cache: maven
       - name: Verify
         run: ./mvnw -B verify --no-transfer-progress
@@ -45,11 +45,11 @@ jobs:
     needs: build
     steps:
       - uses: actions/checkout@v5
-      - name: Set up Java 21
+      - name: Set up Java 25
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
           cache: maven
       - name: An edited, deleted or reordered entry must break the chain
         # -am because hs-agent depends on hs-gsm, hs-gsm-technique and hs-protocol: without it
