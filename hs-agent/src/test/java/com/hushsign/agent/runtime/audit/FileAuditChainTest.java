@@ -32,7 +32,7 @@ class FileAuditChainTest {
 
     private static void fill(FileAuditChain chain, int entries) {
         for (int i = 1; i <= entries; i++) {
-            assertTrue(chain.record("SENT", "em-" + i, "detail " + i).isPresent());
+            assertTrue(chain.append("SENT", "em-" + i, "detail " + i).isPresent());
         }
     }
 
@@ -63,7 +63,7 @@ class FileAuditChainTest {
         fill(chain(dir), 3);
 
         FileAuditChain reopened = chain(dir);
-        reopened.record("STARTUP", null, "agent restarted");
+        reopened.append("STARTUP", null, "agent restarted");
 
         AuditLog.ChainVerification verification = reopened.verify();
         assertTrue(verification.ok(), verification.problem());

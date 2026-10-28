@@ -55,7 +55,7 @@ public final class PolicyCheckingEmissionHandler implements EmissionHandler {
     public void onCommand(EmissionCommand command) throws Exception {
         PolicyDecision decision = decisionFor(command);
         if (decision.allowed()) {
-            audit.record("POLICY_ALLOW", command.emissionId(), decision.reason());
+            audit.append("POLICY_ALLOW", command.emissionId(), decision.reason());
             delegate.onCommand(command);
             return;
         }
@@ -65,8 +65,8 @@ public final class PolicyCheckingEmissionHandler implements EmissionHandler {
         // may not. The cap reason names the target number, and SECURITY.md promises that
         // hs.transmissions.v1 carries no target number - so scrub before recording, not later
         // when the platform projects it.
-        audit.record("POLICY_REJECT", command.emissionId(), decision.reason());
-        recorder.record(command, "BLOCKED_BY_POLICY", SensitiveRedactor.scrub(decision.reason()),
+        audit.append("POLICY_REJECT", command.emissionId(), decision.reason());
+        recorder.recordAttempt(command, "BLOCKED_BY_POLICY", SensitiveRedactor.scrub(decision.reason()),
                 Instant.now(clock));
     }
 

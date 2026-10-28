@@ -8,5 +8,5 @@ package com.hushsign.agent.runtime.spool;
 @FunctionalInterface
 public interface SpoolSender {
 
-    void send(SpooledRecord record) throws Exception;
+    void send(SpooledRecord entry) throws Exception;
 }

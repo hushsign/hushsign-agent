@@ -184,8 +184,8 @@ class EmissionExecutorTest {
         }
 
         assertEquals(techniques.length, spool.size());
-        for (var record : spool.peekAll()) {
-            TransmissionResult result = ProtocolJson.read(record.value(), TransmissionResult.class);
+        for (var entry : spool.peekAll()) {
+            TransmissionResult result = ProtocolJson.read(entry.value(), TransmissionResult.class);
             assertEquals("ACCEPTED", result.outcome());
         }
     }

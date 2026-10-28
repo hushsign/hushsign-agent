@@ -84,15 +84,15 @@ public final class Spool {
      * a failed attempt and retries once the broker drains the buffer.
      */
     public synchronized void enqueue(String topic, String key, String value) {
-        SpooledRecord record = new SpooledRecord(topic, key, value);
-        long projected = sizeBytes() + ProtocolJson.write(record).length() + 1L;
+        SpooledRecord entry = new SpooledRecord(topic, key, value);
+        long projected = sizeBytes() + ProtocolJson.write(entry).length() + 1L;
         if (projected > maxBytes) {
             throw new SpoolException("spool is full (" + sizeBytes() + " of " + maxBytes
                     + " bytes); refusing to drop evidence for " + topic);
         }
-        records.addLast(record);
+        records.addLast(entry);
         try {
-            appendLine(ProtocolJson.write(record));
+            appendLine(ProtocolJson.write(entry));
         } catch (IOException e) {
             records.removeLast(); // fail closed: nothing spooled that isn't on disk
             throw new SpoolException("cannot persist spooled record for " + topic, e);
@@ -130,12 +130,12 @@ public final class Spool {
             List<SpooledRecord> snapshot = snapshot();
             int sent = 0;
             int removed = 0;
-            for (SpooledRecord record : snapshot) {
+            for (SpooledRecord entry : snapshot) {
                 try {
-                    sender.send(record);
+                    sender.send(entry);
                 } catch (Exception e) {
                     if (isPermanent(e) && ++this.headFailures >= QUARANTINE_AFTER) {
-                        quarantine(record);
+                        quarantine(entry);
                         this.quarantined++;
                         removed++;
                         this.headFailures = 0;
@@ -173,8 +173,8 @@ public final class Spool {
     /** Bytes currently buffered (UTF-8 payload + newline), used for the cap. */
     public synchronized long sizeBytes() {
         long total = 0;
-        for (SpooledRecord record : records) {
-            total += ProtocolJson.write(record).getBytes(StandardCharsets.UTF_8).length + 1L;
+        for (SpooledRecord entry : records) {
+            total += ProtocolJson.write(entry).getBytes(StandardCharsets.UTF_8).length + 1L;
         }
         return total;
     }
@@ -204,12 +204,12 @@ public final class Spool {
         return false;
     }
 
-    private void quarantine(SpooledRecord record) {
+    private void quarantine(SpooledRecord entry) {
         try {
-            appendTo(poisonFile, ProtocolJson.write(record));
+            appendTo(poisonFile, ProtocolJson.write(entry));
         } catch (IOException e) {
             // Keep the record buffered: better a blocked spool than a silent loss.
-            throw new SpoolException("cannot quarantine spooled record for " + record.topic(), e);
+            throw new SpoolException("cannot quarantine spooled record for " + entry.topic(), e);
         }
     }
 
@@ -292,8 +292,8 @@ public final class Spool {
         Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
         try (BufferedWriter writer = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-            for (SpooledRecord record : records) {
-                writer.write(ProtocolJson.write(record));
+            for (SpooledRecord entry : records) {
+                writer.write(ProtocolJson.write(entry));
                 writer.newLine();
             }
         }

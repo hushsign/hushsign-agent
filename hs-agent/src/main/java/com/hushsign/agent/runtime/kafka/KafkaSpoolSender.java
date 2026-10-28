@@ -39,8 +39,8 @@ public final class KafkaSpoolSender implements SpoolSender, AutoCloseable {
     }
 
     @Override
-    public void send(SpooledRecord record) throws Exception {
-        ProducerRecord<String, String> out = new ProducerRecord<>(record.topic(), record.key(), record.value());
+    public void send(SpooledRecord entry) throws Exception {
+        ProducerRecord<String, String> out = new ProducerRecord<>(entry.topic(), entry.key(), entry.value());
         producer.send(out).get(sendTimeout.toMillis(), TimeUnit.MILLISECONDS);
     }
 

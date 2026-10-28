@@ -147,8 +147,8 @@ public final class CancellationConsumer implements AutoCloseable {
     public int pollOnce(Duration timeout) {
         ConsumerRecords<String, String> records = consumer.poll(timeout);
         boolean batchHandled = true;
-        for (var record : records) {
-            String raw = record.value();
+        for (var consumerRecord : records) {
+            String raw = consumerRecord.value();
             EmissionCancelled cancelled;
             try {
                 validator.validate(MessageType.EMISSION_CANCELLED, raw, Instant.now(clock));
@@ -162,9 +162,9 @@ public final class CancellationConsumer implements AutoCloseable {
                 cancellations.cancel(cancelled.emissionId());
                 applied.incrementAndGet();
             } catch (RuntimeException e) {
-                rewindTo(record);
+                rewindTo(consumerRecord);
                 LOG.error("cannot record cancellation for {} at offset {}; batch uncommitted and rewound",
-                        cancelled.emissionId(), record.offset(), e);
+                        cancelled.emissionId(), consumerRecord.offset(), e);
                 batchHandled = false;
                 break;
             }
@@ -177,11 +177,11 @@ public final class CancellationConsumer implements AutoCloseable {
         return records.count();
     }
 
-    private void rewindTo(ConsumerRecord<String, String> record) {
+    private void rewindTo(ConsumerRecord<String, String> consumerRecord) {
         try {
-            consumer.seek(new TopicPartition(record.topic(), record.partition()), record.offset());
+            consumer.seek(new TopicPartition(consumerRecord.topic(), consumerRecord.partition()), consumerRecord.offset());
         } catch (RuntimeException e) {
-            LOG.warn("cannot rewind cancellation offset {}: {}", record.offset(), e.getMessage());
+            LOG.warn("cannot rewind cancellation offset {}: {}", consumerRecord.offset(), e.getMessage());
         }
     }
 

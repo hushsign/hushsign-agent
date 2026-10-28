@@ -27,9 +27,9 @@ class AuditCliTest {
 
     private static Path chainIn(Path workDir) {
         FileAuditChain chain = FileAuditChain.open(workDir.resolve("audit"), "gw-1", 0, CLOCK);
-        chain.record("STARTUP", null, "agent version test");
-        chain.record("POLICY_ALLOW", "em-1", "within caps");
-        chain.record("POLICY_REJECT", "em-2", "quiet hours 23:00-06:00");
+        chain.append("STARTUP", null, "agent version test");
+        chain.append("POLICY_ALLOW", "em-1", "within caps");
+        chain.append("POLICY_REJECT", "em-2", "quiet hours 23:00-06:00");
         return workDir;
     }
 

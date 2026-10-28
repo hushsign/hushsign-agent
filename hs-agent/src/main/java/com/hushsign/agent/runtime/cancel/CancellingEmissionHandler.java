@@ -49,7 +49,7 @@ public final class CancellingEmissionHandler implements EmissionHandler {
         }
         cancelled.incrementAndGet();
         LOG.info("emission {} attempt {} was cancelled - not sending", command.emissionId(), command.attempt());
-        recorder.record(command, "CANCELLED", "cancelled by the platform before execution", Instant.now(clock));
+        recorder.recordAttempt(command, "CANCELLED", "cancelled by the platform before execution", Instant.now(clock));
     }
 
     @Override

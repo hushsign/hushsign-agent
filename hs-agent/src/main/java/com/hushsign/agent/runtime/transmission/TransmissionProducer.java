@@ -85,7 +85,7 @@ public final class TransmissionProducer implements TransmissionRecorder {
 
     /** {@link TransmissionRecorder}: an attempt that produced no PDU. */
     @Override
-    public void record(EmissionCommand command, String outcome, String failureCause, Instant requestedAt) {
+    public void recordAttempt(EmissionCommand command, String outcome, String failureCause, Instant requestedAt) {
         report(command, outcome, failureCause, null, requestedAt);
     }
 }

@@ -69,11 +69,11 @@ class SpoolTest {
 
         List<String> sent = new ArrayList<>();
         AtomicInteger attempts = new AtomicInteger();
-        int flushed = spool.flushTo(record -> {
+        int flushed = spool.flushTo(entry -> {
             if (attempts.incrementAndGet() == 2) {
                 throw new IOException("broker down on the second record");
             }
-            sent.add(record.key());
+            sent.add(entry.key());
         });
 
         assertEquals(1, flushed, "the flush stops at the first failure");
@@ -82,7 +82,7 @@ class SpoolTest {
         assertEquals(List.of("k2", "k3"), spool.peekAll().stream().map(SpooledRecord::key).toList());
 
         // broker back: the rest flushes in order
-        int remaining = spool.flushTo(record -> sent.add(record.key()));
+        int remaining = spool.flushTo(entry -> sent.add(entry.key()));
         assertEquals(2, remaining);
         assertEquals(List.of("k1", "k2", "k3"), sent);
         assertEquals(0, spool.size());
@@ -107,7 +107,7 @@ class SpoolTest {
     @Test
     void emptySpoolFlushesNothing() {
         Spool spool = Spool.open(file());
-        assertEquals(0, spool.flushTo(record -> {
+        assertEquals(0, spool.flushTo(entry -> {
             throw new AssertionError("nothing to send");
         }));
     }
@@ -174,11 +174,11 @@ class SpoolTest {
         enqueue(spool, "t", "k2", "{\"n\":2}");
 
         List<String> sent = new ArrayList<>();
-        SpoolSender sender = record -> {
-            if ("poison".equals(record.key())) {
+        SpoolSender sender = entry -> {
+            if ("poison".equals(entry.key())) {
                 throw new org.apache.kafka.common.errors.RecordTooLargeException("too large");
             }
-            sent.add(record.key());
+            sent.add(entry.key());
         };
 
         // A non-retriable failure is retried a few times, then moved aside.
@@ -201,7 +201,7 @@ class SpoolTest {
         Spool spool = Spool.open(file());
         enqueue(spool, "t", "k1", "{\"n\":1}");
 
-        SpoolSender outage = record -> {
+        SpoolSender outage = entry -> {
             throw new java.util.concurrent.TimeoutException("broker unreachable");
         };
         for (int i = 0; i < Spool.QUARANTINE_AFTER * 2; i++) {
@@ -237,7 +237,7 @@ class SpoolTest {
         spool.enqueue("hs.transmissions.v1", "k", "{\"first\":1}");
         CountDownLatch inSend = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        SpoolSender blocked = record -> {
+        SpoolSender blocked = entry -> {
             inSend.countDown();
             release.await(10, TimeUnit.SECONDS);
         };

@@ -187,12 +187,12 @@ public final class EmissionConsumer implements AutoCloseable {
         ConsumerRecords<String, String> records = consumer.poll(timeout);
         int count = records.count();
         boolean batchHandled = true;
-        for (var record : records) {
+        for (var consumerRecord : records) {
             if (closed.get()) {
                 batchHandled = false;
                 break;
             }
-            String raw = record.value();
+            String raw = consumerRecord.value();
             try {
                 validator.validate(MessageType.EMISSION_COMMAND, raw, Instant.now(clock));
             } catch (CommandValidator.StaleCommandException e) {
@@ -226,9 +226,9 @@ public final class EmissionConsumer implements AutoCloseable {
             } catch (Exception e) {
                 // Without the rewind the position would already be past this
                 // record, so "uncommitted" alone means "lost until restart".
-                rewindTo(record);
+                rewindTo(consumerRecord);
                 LOG.error("handler failed on {} at offset {}; batch uncommitted and rewound",
-                        topic(), record.offset(), e);
+                        topic(), consumerRecord.offset(), e);
                 batchHandled = false;
                 break;
             }
@@ -241,13 +241,13 @@ public final class EmissionConsumer implements AutoCloseable {
         return count;
     }
 
-    private void rewindTo(ConsumerRecord<String, String> record) {
+    private void rewindTo(ConsumerRecord<String, String> consumerRecord) {
         try {
-            consumer.seek(new TopicPartition(record.topic(), record.partition()), record.offset());
+            consumer.seek(new TopicPartition(consumerRecord.topic(), consumerRecord.partition()), consumerRecord.offset());
         } catch (RuntimeException e) {
             // A rebalance may have revoked the partition; the uncommitted offset
             // still guarantees redelivery after the next assignment.
-            LOG.warn("cannot rewind {} to offset {}: {}", topic(), record.offset(), e.getMessage());
+            LOG.warn("cannot rewind {} to offset {}: {}", topic(), consumerRecord.offset(), e.getMessage());
         }
     }
 

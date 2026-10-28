@@ -61,7 +61,7 @@ class AuditDigestPublisherTest {
         assertTrue(this.publisher.pulse().isEmpty());
         assertEquals(0, this.spool.size());
         assertEquals(0, this.spool.peekAll().stream()
-                .filter(record -> Topics.AUDIT_DIGEST.equals(record.topic())).count());
+                .filter(entry -> Topics.AUDIT_DIGEST.equals(entry.topic())).count());
     }
 
     @Test
@@ -89,7 +89,7 @@ class AuditDigestPublisherTest {
         publishAt("2026-10-27T10:00:00Z");
 
         List<SpooledRecord> digests = this.spool.peekAll().stream()
-                .filter(record -> Topics.AUDIT_DIGEST.equals(record.topic())).toList();
+                .filter(entry -> Topics.AUDIT_DIGEST.equals(entry.topic())).toList();
         assertEquals(1, digests.size());
         assertEquals(GATEWAY, digests.get(0).key());
         new ProtocolValidator().validate(MessageType.AUDIT_DIGEST, digests.get(0).value());
@@ -173,7 +173,7 @@ class AuditDigestPublisherTest {
 
         assertTrue(publishAt("2026-10-27T10:30:00Z").isEmpty());
         assertEquals(1, this.spool.peekAll().stream()
-                .filter(record -> Topics.AUDIT_DIGEST.equals(record.topic())).count());
+                .filter(entry -> Topics.AUDIT_DIGEST.equals(entry.topic())).count());
     }
 
     @Test
@@ -204,7 +204,7 @@ class AuditDigestPublisherTest {
 
     private void recordEntries(int count) {
         for (int i = 0; i < count; i++) {
-            this.audit.record("TEST", "em-" + i, "entry " + i);
+            this.audit.append("TEST", "em-" + i, "entry " + i);
         }
     }
 

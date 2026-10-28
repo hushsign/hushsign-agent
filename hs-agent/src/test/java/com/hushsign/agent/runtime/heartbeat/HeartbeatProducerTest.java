@@ -141,13 +141,13 @@ class HeartbeatProducerTest {
         GatewayHeartbeat heartbeat = producer.pulse();
 
         assertEquals(1, spool.size());
-        SpooledRecord record = spool.peekAll().get(0);
-        assertEquals(Topics.FLEET_HEARTBEAT, record.topic());
-        assertEquals("gw-buc-01", record.key(), "heartbeats are keyed by gatewayId");
+        SpooledRecord entry = spool.peekAll().get(0);
+        assertEquals(Topics.FLEET_HEARTBEAT, entry.topic());
+        assertEquals("gw-buc-01", entry.key(), "heartbeats are keyed by gatewayId");
 
-        GatewayHeartbeat parsed = ProtocolJson.read(record.value(), GatewayHeartbeat.class);
+        GatewayHeartbeat parsed = ProtocolJson.read(entry.value(), GatewayHeartbeat.class);
         assertEquals(heartbeat, parsed, "wire round-trip");
-        validator.validate(MessageType.GATEWAY_HEARTBEAT, record.value());
+        validator.validate(MessageType.GATEWAY_HEARTBEAT, entry.value());
     }
 
     @Test
@@ -243,7 +243,7 @@ class HeartbeatProducerTest {
         producer.pulse();
 
         List<String> sent = new ArrayList<>();
-        int flushed = spool.flushTo(record -> sent.add(record.value()));
+        int flushed = spool.flushTo(entry -> sent.add(entry.value()));
 
         assertEquals(2, flushed);
         assertTrue(ProtocolJson.read(sent.get(0), GatewayHeartbeat.class).sequence()

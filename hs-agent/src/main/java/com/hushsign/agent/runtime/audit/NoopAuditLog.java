@@ -13,7 +13,7 @@ public final class NoopAuditLog implements AuditLog {
     }
 
     @Override
-    public Optional<AuditEntry> record(String type, String emissionId, String detail) {
+    public Optional<AuditEntry> append(String type, String emissionId, String detail) {
         return Optional.empty();
     }
 

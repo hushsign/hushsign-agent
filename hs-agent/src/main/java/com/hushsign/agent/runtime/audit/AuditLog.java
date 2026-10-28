@@ -15,7 +15,7 @@ import java.util.Optional;
 public interface AuditLog {
 
     /** Appends one entry, or returns empty when the log is not writable. */
-    Optional<AuditEntry> record(String type, String emissionId, String detail);
+    Optional<AuditEntry> append(String type, String emissionId, String detail);
 
     /** Walks the chain and reports the first place it does not hold. */
     ChainVerification verify();

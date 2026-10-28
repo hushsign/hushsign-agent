@@ -57,7 +57,7 @@ class PolicyCheckingEmissionHandlerTest {
         final List<Instant> requestedAt = new ArrayList<>();
 
         @Override
-        public void record(EmissionCommand command, String outcome, String failureCause, Instant when) {
+        public void recordAttempt(EmissionCommand command, String outcome, String failureCause, Instant when) {
             outcomes.add(outcome);
             causes.add(failureCause);
             requestedAt.add(when);

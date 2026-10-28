@@ -22,5 +22,5 @@ public interface TransmissionRecorder {
      * @param failureCause reason for the refusal, or {@code null}
      * @param requestedAt when the agent decided on the attempt
      */
-    void record(EmissionCommand command, String outcome, String failureCause, Instant requestedAt);
+    void recordAttempt(EmissionCommand command, String outcome, String failureCause, Instant requestedAt);
 }

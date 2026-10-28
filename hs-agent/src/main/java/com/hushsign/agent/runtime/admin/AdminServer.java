@@ -123,7 +123,7 @@ public final class AdminServer implements AutoCloseable {
 
     private Object reload() {
         AdminRuntime.PolicyReload reload = this.runtime.reloadPolicy();
-        this.audit.record("POLICY_RELOAD", null,
+        this.audit.append("POLICY_RELOAD", null,
                 (reload.applied() ? "applied: " : "refused: ") + reload.detail());
         return reload;
     }
@@ -132,7 +132,7 @@ public final class AdminServer implements AutoCloseable {
         if (changed) {
             // The address is the whole value of this line: it answers "who told the gateway to
             // stop sending", which is the first question after an incident.
-            this.audit.record("ADMIN_COMMAND", null, action + " from " + exchange.getRemoteAddress());
+            this.audit.append("ADMIN_COMMAND", null, action + " from " + exchange.getRemoteAddress());
             LOG.warn("admin {} from {}", action, exchange.getRemoteAddress());
         }
         AdminStatus status = this.runtime.status();
@@ -176,7 +176,7 @@ public final class AdminServer implements AutoCloseable {
         if (now - last > DENIAL_AUDIT_INTERVAL_MS && this.lastDenialAuditAt.compareAndSet(last, now)) {
             // Rate limited: an unauthenticated caller must not be able to fill the audit chain,
             // but a refusal is worth having on record.
-            this.audit.record("ADMIN_DENIED", null,
+            this.audit.append("ADMIN_DENIED", null,
                     "bad or missing token from " + exchange.getRemoteAddress());
         }
         LOG.warn("admin request refused from {}: bad or missing token", exchange.getRemoteAddress());

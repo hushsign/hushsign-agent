@@ -95,7 +95,7 @@ public final class FileAuditChain implements AuditLog {
     }
 
     @Override
-    public Optional<AuditEntry> record(String type, String emissionId, String detail) {
+    public Optional<AuditEntry> append(String type, String emissionId, String detail) {
         synchronized (writeLock) {
             AuditEntry entry = AuditEntry.next(sequence.get() + 1, Instant.now(clock), gatewayId, type,
                     emissionId, detail, lastHash);

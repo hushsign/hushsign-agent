@@ -93,7 +93,7 @@ public final class AuditDigestPublisher {
 
         // Recorded after the window was read, so the digest's own entry belongs to the next hour.
         // That makes "the device said N entries hashing to H" something the chain itself attests.
-        this.audit.record("AUDIT_DIGEST", null,
+        this.audit.append("AUDIT_DIGEST", null,
                 "period " + from + ".." + due + " entries=" + summary.entryCount()
                         + " head=" + summary.chainHead());
         return Optional.of(digest);

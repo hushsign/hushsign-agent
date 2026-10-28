@@ -65,9 +65,9 @@ class TransmissionProducerTest {
                 command(), TransmissionResult.Outcome.ACCEPTED, null, "0011AA22", NOW.minusSeconds(5));
 
         assertEquals(1, spool.size());
-        SpooledRecord record = lastSpooled();
-        assertEquals(Topics.TRANSMISSIONS, record.topic());
-        assertEquals("5c9f7a2e-66f1-4b1f-9e7f-1f2a3b4c5d6e", record.key());
+        SpooledRecord entry = lastSpooled();
+        assertEquals(Topics.TRANSMISSIONS, entry.topic());
+        assertEquals("5c9f7a2e-66f1-4b1f-9e7f-1f2a3b4c5d6e", entry.key());
 
         TransmissionResult parsed = lastParsed();
         assertEquals("1", parsed.protocolVersion());
