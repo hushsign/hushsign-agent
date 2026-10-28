@@ -83,7 +83,8 @@ class Gsm7Test {
 
     @Test
     void moreThanOneHundredAndSixtySeptetsIsRefused() {
-        assertThrows(IllegalArgumentException.class, () -> Gsm7.encode("A".repeat(161)));
+        String tooLong = "A".repeat(161);
+        assertThrows(IllegalArgumentException.class, () -> Gsm7.encode(tooLong));
         assertEquals(160, Gsm7.septetCount("A".repeat(160)));
     }
 

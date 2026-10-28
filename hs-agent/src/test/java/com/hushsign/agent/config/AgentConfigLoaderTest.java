@@ -23,6 +23,9 @@ class AgentConfigLoaderTest {
     @TempDir
     Path tempDir;
 
+    /** No environment overrides: a constant so a lambda only ever calls the loader. */
+    private static final Map<String, String> NO_ENV = Map.of();
+
     private Path write(String yaml) throws IOException {
         Path file = tempDir.resolve("agent.yaml");
         Files.writeString(file, yaml);
@@ -51,18 +54,21 @@ class AgentConfigLoaderTest {
 
     @Test
     void gatewayIdAndOperatorsAreRequired() {
-        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(null, Map.of()),
+        Map<String, String> empty = Map.of();
+        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(null, empty),
                 "gatewayId must be required");
-        assertThrows(ConfigException.class,
-                () -> AgentConfigLoader.load(null, Map.of("HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11")),
+        Map<String, String> onlyGateway = Map.of("HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11");
+        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(null, onlyGateway),
                 "operators must be required");
     }
 
     @Test
     void aGatewayIdThatIsNotAUuidIsRefusedAtStartup() {
+        // The env map is built outside the lambda so the only thing that can throw inside it is
+        // the load - otherwise the assertion passes when Map.of throws instead.
+        Map<String, String> env = Map.of("HS_GATEWAY_ID", "gw-buc-01", "HS_OPERATORS", "226-10");
         ConfigException refused = assertThrows(ConfigException.class,
-                () -> AgentConfigLoader.load(null,
-                        Map.of("HS_GATEWAY_ID", "gw-buc-01", "HS_OPERATORS", "226-10")));
+                () -> AgentConfigLoader.load(null, env));
 
         assertTrue(refused.getMessage().contains("uuid"), refused.getMessage());
         assertTrue(refused.getMessage().contains("fleet registry"), "the operator needs to know where the id comes from");
@@ -149,7 +155,7 @@ class AgentConfigLoaderTest {
                 operators: ["226-10"]
                 bogusKey: true
                 """);
-        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(file, Map.of()));
+        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(file, NO_ENV));
 
         Path nested = write("""
                 gatewayId: 4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11
@@ -157,28 +163,32 @@ class AgentConfigLoaderTest {
                 modems:
                   baud: 9600
                 """);
-        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(nested, Map.of()));
+        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(nested, NO_ENV));
     }
 
     @Test
     void invalidValuesAreRejected() throws Exception {
-        assertThrows(ConfigException.class,
-                () -> AgentConfigLoader.load(null, Map.of("HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "abc")),
+        Map<String, String> badOperator = Map.of(
+                "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "abc");
+        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(null, badOperator),
                 "operators must match MCC-MNC");
-        assertThrows(ConfigException.class,
-                () -> AgentConfigLoader.load(null, Map.of(
-                        "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "226-10",
-                        "HS_HEARTBEAT_INTERVAL_SECONDS", "0")),
+
+        Map<String, String> zeroInterval = Map.of(
+                "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "226-10",
+                "HS_HEARTBEAT_INTERVAL_SECONDS", "0");
+        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(null, zeroInterval),
                 "interval must be positive");
-        assertThrows(ConfigException.class,
-                () -> AgentConfigLoader.load(null, Map.of(
-                        "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "226-10",
-                        "HS_MODEMS_AUTO_SCAN", "yes")),
+
+        Map<String, String> yesIsNotABoolean = Map.of(
+                "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "226-10",
+                "HS_MODEMS_AUTO_SCAN", "yes");
+        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(null, yesIsNotABoolean),
                 "booleans must be true/false");
-        assertThrows(ConfigException.class,
-                () -> AgentConfigLoader.load(null, Map.of(
-                        "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "226-10",
-                        "HS_MODEMS_BAUD_RATE", "fast")),
+
+        Map<String, String> unparseableBaud = Map.of(
+                "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "226-10",
+                "HS_MODEMS_BAUD_RATE", "fast");
+        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(null, unparseableBaud),
                 "ints must parse");
     }
 
@@ -189,7 +199,7 @@ class AgentConfigLoaderTest {
                 operators: ["226-10"]
                 modems: 9600
                 """);
-        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(file, Map.of()));
+        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(file, NO_ENV));
     }
 
     @Test
@@ -201,7 +211,7 @@ class AgentConfigLoaderTest {
                   autoScan: false
                   ports: []
                 """);
-        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(file, Map.of()));
+        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(file, NO_ENV));
 
         Path ok = write("""
                 gatewayId: 4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11
@@ -230,10 +240,12 @@ class AgentConfigLoaderTest {
         assertEquals("TPDU_HEX", config.modems().pduSubmission(),
                 "the Huawei K3765 family needs the TPDU form (P1-S14)");
 
-        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(null, Map.of(
+        Map<String, String> sharedEnv = Map.of(
                 "HS_GATEWAY_ID", "4f2c9c1e-0f4e-4f36-9d43-2f0a4a6b1c11", "HS_OPERATORS", "226-10",
                 "HS_MODEMS_AUTO_SCAN", "false", "HS_MODEMS_PORTS", "COM6",
-                "HS_MODEMS_PDU_SUBMISSION", "binary")));
+                "HS_MODEMS_PDU_SUBMISSION", "binary");
+        assertThrows(ConfigException.class, () -> AgentConfigLoader.load(null, sharedEnv),
+                "an unknown pduSubmission must be refused, not defaulted");
     }
 
     @Test

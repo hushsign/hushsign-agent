@@ -110,8 +110,9 @@ class TransmissionProducerTest {
 
     @Test
     void invalidOutcomeNeverReachesTheSpool() {
+        EmissionCommand command = command();
         assertThrows(ProtocolValidationException.class, () ->
-                producer.report(command(), "MAYBE", null, null, NOW));
+                producer.report(command, "MAYBE", null, null, NOW));
         assertEquals(0, spool.size());
     }
 }

@@ -81,39 +81,45 @@ class PolicySettingsLoaderTest {
 
     @Test
     void anUnknownKeyIsRefused(@TempDir Path dir) throws Exception {
+        Path file = write(dir, "allowEverything: true");
         ConfigException error = assertThrows(ConfigException.class,
-                () -> PolicySettingsLoader.load(write(dir, "allowEverything: true")));
+                () -> PolicySettingsLoader.load(file));
 
         assertTrue(error.getMessage().contains("unknown policy key allowEverything"), error.getMessage());
     }
 
     @Test
     void aTypoInsideASectionIsRefused(@TempDir Path dir) throws Exception {
-        ConfigException error = assertThrows(ConfigException.class, () -> PolicySettingsLoader.load(write(dir, """
+        Path file = write(dir, """
                 techniques:
                   allowed: [SILENT_TP0]
-                """)));
+                """);
+        ConfigException error = assertThrows(ConfigException.class,
+                () -> PolicySettingsLoader.load(file));
 
         assertTrue(error.getMessage().contains("techniques.allowed"), error.getMessage());
     }
 
     @Test
     void aBadQuietHourIsRefused(@TempDir Path dir) throws Exception {
-        ConfigException error = assertThrows(ConfigException.class, () -> PolicySettingsLoader.load(write(dir, """
+        Path file = write(dir, """
                 quietHours:
                   start: "25:99"
                   end: "06:00"
-                """)));
+                """);
+        ConfigException error = assertThrows(ConfigException.class,
+                () -> PolicySettingsLoader.load(file));
 
         assertTrue(error.getMessage().contains("quietHours.start must be HH:mm"), error.getMessage());
     }
 
     @Test
     void aNegativeCapIsRefused(@TempDir Path dir) throws Exception {
-        assertThrows(ConfigException.class, () -> PolicySettingsLoader.load(write(dir, """
+        Path file = write(dir, """
                 caps:
                   perTargetPerHour: -1
-                """)));
+                """);
+        assertThrows(ConfigException.class, () -> PolicySettingsLoader.load(file));
     }
 
     @Test

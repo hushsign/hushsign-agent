@@ -73,8 +73,9 @@ class CommandValidatorTest {
                 GoldenPayloads.load("emission-command.json"));
         node.put("issuedAt", NOW.minusSeconds(10).toString());
         node.put("expiresAt", NOW.minusSeconds(20).toString()); // expiresAt before issuedAt
+        String payload = ProtocolJson.write(node);
         assertThrows(IllegalArgumentException.class,
-                () -> VALIDATOR.validate(MessageType.EMISSION_COMMAND, ProtocolJson.write(node), NOW));
+                () -> VALIDATOR.validate(MessageType.EMISSION_COMMAND, payload, NOW));
     }
 
     @Test
@@ -83,15 +84,17 @@ class CommandValidatorTest {
                 GoldenPayloads.load("emission-command.json"));
         node.put("attempt", 4); // maxAttempts = 3
         node.put("issuedAt", NOW.minusSeconds(10).toString());
+        String payload = ProtocolJson.write(node);
         assertThrows(IllegalArgumentException.class,
-                () -> VALIDATOR.validate(MessageType.EMISSION_COMMAND, ProtocolJson.write(node), NOW));
+                () -> VALIDATOR.validate(MessageType.EMISSION_COMMAND, payload, NOW));
     }
 
     @Test
     void nonCommandTypesAreRejected() {
         JsonNode heartbeat = ProtocolJson.tree(
                 GoldenPayloads.load("gateway-heartbeat.json"));
+        String payload = ProtocolJson.write(heartbeat);
         assertThrows(IllegalArgumentException.class,
-                () -> VALIDATOR.validate(MessageType.GATEWAY_HEARTBEAT, ProtocolJson.write(heartbeat), NOW));
+                () -> VALIDATOR.validate(MessageType.GATEWAY_HEARTBEAT, payload, NOW));
     }
 }

@@ -63,23 +63,26 @@ class KafkaClientSettingsTest {
 
     @Test
     void saslWithoutCredentialsFailsFast() {
+        AgentConfig.KafkaConfig saslWithoutPassword = kafka("SASL_SSL",
+                "SCRAM-SHA-512", "gw", null, "/etc/truststore.p12", null);
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> KafkaClientSettings.common(kafka("SASL_SSL",
-                        "SCRAM-SHA-512", "gw", null, "/etc/truststore.p12", null)));
+                () -> KafkaClientSettings.common(saslWithoutPassword));
         assertTrue(e.getMessage().contains("saslPassword"), e.getMessage());
     }
 
     @Test
     void sslWithoutTruststoreFailsFast() {
+        AgentConfig.KafkaConfig sslWithoutTruststore = kafka("SSL", null, null, null, "  ", null);
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> KafkaClientSettings.common(kafka("SSL", null, null, null, "  ", null)));
+                () -> KafkaClientSettings.common(sslWithoutTruststore));
         assertTrue(e.getMessage().contains("truststorePath"), e.getMessage());
     }
 
     @Test
     void unknownProtocolFailsFast() {
+        AgentConfig.KafkaConfig unknownProtocol = kafka("PLAINTEXT_TYPO", null, null, null, null, null);
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> KafkaClientSettings.common(kafka("PLAINTEXT_TYPO", null, null, null, null, null)));
+                () -> KafkaClientSettings.common(unknownProtocol));
         assertTrue(e.getMessage().contains("security.protocol"), e.getMessage());
     }
 

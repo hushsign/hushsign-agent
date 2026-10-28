@@ -159,8 +159,9 @@ class SpoolTest {
         Spool spool = Spool.open(file(), 200);
         enqueue(spool, "t", "k1", "{\"n\":1}");
 
+        String overflowing = "{\"padding\":\"" + "x".repeat(300) + "\"}";
         SpoolException e = assertThrows(SpoolException.class,
-                () -> spool.enqueue("t", "k2", "{\"padding\":\"" + "x".repeat(300) + "\"}"));
+                () -> spool.enqueue("t", "k2", overflowing));
         assertTrue(e.getMessage().contains("spool is full"), e.getMessage());
         assertEquals(1, spool.size(), "the rejected record must not be buffered");
         assertEquals(1, Spool.open(file(), 400).size(), "and it must not be on disk either");

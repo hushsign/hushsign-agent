@@ -100,7 +100,8 @@ class DedupingEmissionHandlerTest {
         DedupingEmissionHandler failing =
                 new DedupingEmissionHandler(store, collector(seen, failure));
 
-        assertThrows(IllegalStateException.class, () -> failing.onCommand(command(ID, 1)));
+        EmissionCommand firstAttempt = command(ID, 1);
+        assertThrows(IllegalStateException.class, () -> failing.onCommand(firstAttempt));
         assertEquals(0, store.size(), "an unexecuted attempt must not stay claimed");
 
         List<String> retried = new ArrayList<>();
@@ -125,7 +126,8 @@ class DedupingEmissionHandlerTest {
             }
         });
 
-        assertThrows(EmissionExecutionException.class, () -> handler.onCommand(command(ID, 1)));
+        EmissionCommand redelivered = command(ID, 1);
+        assertThrows(EmissionExecutionException.class, () -> handler.onCommand(redelivered));
         assertEquals(1, store.size(), "the claim must survive a reporting failure after the send");
 
         // The redelivery is deduped (no exception) — nothing reaches the modem twice.
