@@ -93,7 +93,7 @@ class Gsm7Test {
      * round-trip a check rather than a tautology.
      */
     private static String decode(String hex, int septets) {
-        byte[] octets = java.util.HexFormat.of().parseHex(hex);
+        byte[] octets = HexFormat.of().parseHex(hex);
         StringBuilder out = new StringBuilder(septets);
         int bitOffset = 0;
         for (int i = 0; i < septets; i++) {

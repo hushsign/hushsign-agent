@@ -328,14 +328,6 @@ public final class AgentConfigLoader {
                 .toList();
     }
 
-    private static int parseInt(String name, String raw) {
-        try {
-            return Integer.parseInt(raw.trim());
-        } catch (NumberFormatException e) {
-            throw new ConfigException(name + " must be an integer, got '" + raw + "'");
-        }
-    }
-
     private static int positive(int value, String name) {
         if (value < 1) {
             throw new ConfigException(name + " must be >= 1, got " + value);

@@ -44,6 +44,7 @@ class DedupingEmissionHandlerTest {
 
             @Override
             public void onRejected(String rawPayload, EmissionConsumer.RejectReason reason) {
+                // Not under test: this double only exercises the command path.
             }
         };
     }
@@ -120,6 +121,7 @@ class DedupingEmissionHandlerTest {
 
             @Override
             public void onRejected(String rawPayload, EmissionConsumer.RejectReason reason) {
+                // Not under test: this double only exercises the command path.
             }
         });
 
@@ -140,6 +142,7 @@ class DedupingEmissionHandlerTest {
                 new EmissionHandler() {
                     @Override
                     public void onCommand(EmissionCommand command) {
+                        // Not under test: this double only exercises the rejection path.
                     }
 
                     @Override

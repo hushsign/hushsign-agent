@@ -21,7 +21,6 @@ class AtLayerSmokeTest {
 
     private static class FakeModemContext implements ModemContext {
         private final DeviceInformation deviceInformation = new DeviceInformation();
-        private final Capabilities capabilities = new Capabilities();
 
         @Override
         public DeviceInformation getDeviceInformation() {
@@ -45,6 +44,8 @@ class AtLayerSmokeTest {
 
         @Override
         public void setCapabilities(Capabilities caps) {
+            // The AT layer hands its capability flags back here; nothing in this test asserts
+            // them, and storing them would be state the test never reads.
         }
     }
 
@@ -57,10 +58,12 @@ class AtLayerSmokeTest {
 
         @Override
         public void openPort() {
+            // No real port: the driver talks to the StringBuilder in `sent`.
         }
 
         @Override
         public void closePort() {
+            // Nothing was opened.
         }
 
         @Override

@@ -26,6 +26,12 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <slf4j.version>2.0.16</slf4j.version>
     <logback.version>1.5.12</logback.version>
+    <!-- SonarQube analysis is configured by scripts/scan-sonar.ps1, not here and not in
+         sonar-project.properties. Measured, not assumed: the Maven scanner does not read
+         sonar-project.properties at all, and a sonar.* property in this POM is not forwarded
+         to the scanner either - the identical exclusion value closes 223 findings when passed
+         as -Dsonar.exclusions and none when set here. Configuration that looks real and does
+         nothing is worse than none, so the flags live in one script that CI and a human run. -->
   </properties>
 
   <dependencyManagement>

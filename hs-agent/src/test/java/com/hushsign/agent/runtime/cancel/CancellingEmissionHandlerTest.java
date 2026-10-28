@@ -49,6 +49,7 @@ class CancellingEmissionHandlerTest {
 
             @Override
             public void onRejected(String rawPayload, EmissionConsumer.RejectReason reason) {
+                // Not under test: this double only exercises the command path.
             }
         };
         TransmissionRecorder recorder = (command, outcome, cause, when) -> outcomes.add(outcome);

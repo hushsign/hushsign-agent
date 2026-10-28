@@ -478,7 +478,6 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
     private static final class RuntimeHeartbeatSource implements HeartbeatSource {
 
         private final AgentConfig config;
-        private final Path configFile;
         private final PolicyEngine policyEngine;
         private final Modem modem;
         private final List<EmissionConsumer> consumers;
@@ -491,7 +490,6 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
                                Modem modem, List<EmissionConsumer> consumers, Instant startedAt,
                                String agentVersion) {
             this.config = config;
-            this.configFile = configFile;
             this.policyEngine = policyEngine;
             this.modem = modem;
             this.consumers = consumers;

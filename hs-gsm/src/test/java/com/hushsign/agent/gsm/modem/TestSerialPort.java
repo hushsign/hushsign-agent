@@ -22,9 +22,6 @@ final class TestSerialPort implements SerialPort {
 
     private boolean open;
     private int baudRate;
-    private int dataBits;
-    private int stopBits;
-    private int parity;
     private int readTimeoutMs;
 
     TestSerialPort(String name) {
@@ -115,10 +112,9 @@ final class TestSerialPort implements SerialPort {
 
     @Override
     public void configure(int baudRate, int dataBits, int stopBits, int parity) {
+        // Only the baud rate is ever asserted; the frame format is fixed at 8-N-1 in this fake
+        // because no test depends on it, and a field nobody reads is a claim nobody checks.
         this.baudRate = baudRate;
-        this.dataBits = dataBits;
-        this.stopBits = stopBits;
-        this.parity = parity;
     }
 
     @Override

@@ -102,10 +102,6 @@ public final class CancellationConsumer implements AutoCloseable {
         return props;
     }
 
-    private static KafkaConsumer<String, String> buildConsumer(AgentConfig.KafkaConfig kafka, String gatewayId) {
-        return new KafkaConsumer<>(consumerProperties(kafka, gatewayId));
-    }
-
     /** The consumer group of this gateway. */
     public String groupId() {
         return groupId;
