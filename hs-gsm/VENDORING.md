@@ -50,5 +50,5 @@ message model beyond `MsIsdn`, crypto/encrypted messages (invariant 8).
 
 ## Modernization (P1-S1 baseline)
 
-- Java 21 (upstream was Java 8-era; compiles unchanged).
+- Java 25 (upstream was Java 8-era; compiles unchanged).
 - slf4j-api 2.x for logging; no other runtime dependencies.

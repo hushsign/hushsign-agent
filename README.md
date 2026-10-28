@@ -22,5 +22,5 @@ customer-owned policy file, and records a tamper-evident hash-chained audit log.
 ./mvnw verify        # Windows: .\mvnw.cmd verify
 ```
 
-Requirements: Java 21 (wrapper bundles Maven).
+Requirements: Java 25 (wrapper bundles Maven).
 HushSign agent: open-source GSM edge runtime (hs-gsm, technique generators, policy, audit chain). Apache-2.0.

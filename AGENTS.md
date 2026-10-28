@@ -38,7 +38,7 @@ runs next to GSM modems, talks to the platform over Kafka, keeps a local audit c
 ./mvnw -B verify              # Linux/macOS
 ```
 
-Java 21 required. All tests must be green before a task is reported done; paste the
+Java 25 required. All tests must be green before a task is reported done; paste the
 command and the result. New behaviour needs a test; a bug fix needs a regression test
 that fails before the fix.
 
@@ -68,7 +68,7 @@ that fails before the fix.
 
 ## 5. Coding conventions
 
-- Java 21, records for data carriers, constructor injection, no field injection.
+- Java 25, records for data carriers, constructor injection, no field injection.
 - Vendored files keep upstream packages (`org.smslib.*`, `org.ajwcc.*`) and their
   Apache-2.0 headers; modified files carry a one-line "Modified by HushSign" notice and
   an entry in `hs-gsm/VENDORING.md`.
