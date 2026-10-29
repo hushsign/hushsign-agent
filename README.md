@@ -23,4 +23,10 @@ customer-owned policy file, and records a tamper-evident hash-chained audit log.
 ```
 
 Requirements: Java 25 (wrapper bundles Maven).
+
+VS Code: the Java extension (`redhat.java`) reports "Project configuration is not up-to-date
+with pom.xml" through m2e after a parent-pom change. `.vscode/settings.json` sets
+`java.configuration.updateBuildConfiguration` to `automatic`; a root-pom change still needs one
+**Java: Update Project Configuration** for the child modules. Details and the on-disk state are
+in `hushsign-platform/DEVELOPMENT.md`, "VS Code".
 HushSign agent: open-source GSM edge runtime (hs-gsm, technique generators, policy, audit chain). Apache-2.0.
