@@ -51,13 +51,9 @@ public final class KafkaClientSettings {
         }
         props.put("security.protocol", protocol);
 
-        // One early exit instead of a null check the analyser cannot follow: a security block is
-        // only optional while the protocol stays PLAINTEXT, so everything below may assume it
-        // exists (java:S2259).
+        // A missing security block means PLAINTEXT by construction (the ternary above), so there
+        // is nothing left to validate: the protocol cannot be SASL or SSL here.
         if (security == null) {
-            if (protocol.startsWith("SASL") || protocol.endsWith("SSL")) {
-                throw new IllegalStateException("kafka.security is required for protocol " + protocol);
-            }
             return props;
         }
 
