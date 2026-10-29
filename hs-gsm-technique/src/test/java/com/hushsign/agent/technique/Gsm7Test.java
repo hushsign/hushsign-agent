@@ -1,6 +1,7 @@
 package com.hushsign.agent.technique;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.HexFormat;
@@ -67,7 +68,7 @@ class Gsm7Test {
         IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
                 () -> Gsm7.encode("temperatură"));
 
-        assertEquals(true, refused.getMessage().contains("not in the GSM 03.38 default alphabet"));
+        assertTrue(refused.getMessage().contains("not in the GSM 03.38 default alphabet"));
     }
 
     @Test

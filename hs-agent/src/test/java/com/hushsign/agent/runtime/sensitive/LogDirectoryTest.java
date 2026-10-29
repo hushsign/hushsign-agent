@@ -1,6 +1,8 @@
 package com.hushsign.agent.runtime.sensitive;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,7 +24,7 @@ class LogDirectoryTest {
     void hardeningMakesTheDirectoryOwnerOnly() throws IOException {
         Path dir = Files.createTempDirectory("hs-logdir").resolve("logs");
 
-        assertEquals(true, LogDirectory.harden(dir));
+        assertTrue(LogDirectory.harden(dir));
         assertEquals(Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE,
                 PosixFilePermission.OWNER_EXECUTE), Files.getPosixFilePermissions(dir));
     }
@@ -33,11 +35,11 @@ class LogDirectoryTest {
 
         LogDirectory.harden(dir);
 
-        assertEquals(true, Files.isDirectory(dir));
+        assertTrue(Files.isDirectory(dir));
     }
 
     @Test
     void nothingToHardenIsNotAFailure() {
-        assertEquals(false, LogDirectory.harden(null));
+        assertFalse(LogDirectory.harden(null));
     }
 }

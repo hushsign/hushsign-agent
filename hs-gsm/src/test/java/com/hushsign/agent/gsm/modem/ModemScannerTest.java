@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModemScannerTest {
@@ -59,7 +60,7 @@ class ModemScannerTest {
         assertTrue(found.isPresent());
         assertEquals("COM3", found.get().portName());
         assertEquals("356789123456789", found.get().getDeviceInformation().getSerialNo());
-        assertTrue(!factory.port("COM1").isOpen(), "noise port must be closed");
+        assertFalse(factory.port("COM1").isOpen(), "noise port must be closed");
         assertTrue(factory.port("COM3").isOpen(), "modem port stays open");
     }
 

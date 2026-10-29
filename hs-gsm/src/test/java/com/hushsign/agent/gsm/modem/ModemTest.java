@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.smslib.gateway.modem.DeviceInformation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -61,7 +62,7 @@ class ModemTest {
         TestSerialPort port = new TestSerialPort("COM1");
 
         assertThrows(ModemException.class, () -> Modem.open(port, fastConfig()));
-        assertEquals(false, port.isOpen(), "noise port must be closed by the caller");
+        assertFalse(port.isOpen(), "noise port must be closed by the caller");
     }
 
     @Test
@@ -262,6 +263,6 @@ class ModemTest {
 
         assertTrue(failure.getMessage().contains("+CME ERROR: SIM failure"),
                 "the SIM refusal must be named: " + failure.getMessage());
-        assertEquals(false, port.isOpen(), "a failed init must close the port");
+        assertFalse(port.isOpen(), "a failed init must close the port");
     }
 }

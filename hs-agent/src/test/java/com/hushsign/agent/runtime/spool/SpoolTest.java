@@ -216,9 +216,9 @@ class SpoolTest {
     void retriableKafkaErrorsAreNotPermanent() {
         assertTrue(Spool.isPermanent(new RuntimeException(
                 new org.apache.kafka.common.errors.RecordTooLargeException("too large"))));
-        assertTrue(!Spool.isPermanent(new RuntimeException(
+        assertFalse(Spool.isPermanent(new RuntimeException(
                 new org.apache.kafka.common.errors.TimeoutException("timeout"))));
-        assertTrue(!Spool.isPermanent(new java.io.IOException("connection reset")));
+        assertFalse(Spool.isPermanent(new java.io.IOException("connection reset")));
     }
 
     private static List<String> readLines(Path path) {

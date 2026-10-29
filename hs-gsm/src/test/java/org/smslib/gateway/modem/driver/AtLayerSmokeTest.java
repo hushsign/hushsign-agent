@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -111,7 +112,7 @@ class AtLayerSmokeTest {
         responder.join(5_000);
         command.join(10_000);
 
-        assertTrue(!command.isAlive(), "write() must complete once the response is fed");
+        assertFalse(command.isAlive(), "write() must complete once the response is fed");
         if (errorHolder.get() != null) {
             throw new AssertionError("write() failed", errorHolder.get());
         }
