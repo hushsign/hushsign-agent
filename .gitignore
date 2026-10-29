@@ -19,3 +19,9 @@ Thumbs.db
 
 # editor-generated instructions (not project content)
 copilot-instructions.md
+
+# IntelliJ inspection exports: IDEA writes one <InspectionShortName>.xml per inspection into
+# the project root when the descriptions are exported. They are a snapshot of one analysis,
+# not sources - the triage lives in docs/inspection-triage-2026-10-29.md.
+/*.xml
+!/pom.xml
