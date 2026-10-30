@@ -30,7 +30,9 @@ import java.util.Optional;
  * <p>Window boundaries come from the clock, not from process start, so a restart mid-hour does not
  * shift the grid. Two digests for the same hour can only happen if the process is restarted
  * within that hour after having already published, and they would carry identical content; the
- * platform keys on (gatewayId, periodEnd) and treats that as idempotent.
+ * platform keys on (gatewayId, periodEnd) and treats that as idempotent. The first window after a
+ * restart opens where the chain says the previous one closed, so a window may span downtime: that
+ * is the honest shape of "these are the entries I have since I last reported".
  */
 public final class AuditDigestPublisher {
 
@@ -50,7 +52,14 @@ public final class AuditDigestPublisher {
         this.spool = spool;
         this.gatewayId = gatewayId;
         this.clock = clock;
-        this.publishedThrough = truncate(clock.instant());
+        // Resume where the chain says the last digest ended, not at the current hour. Starting at
+        // the current hour drops whatever was written between the last published window and the
+        // shutdown: the next digest then opens later than the previous one closed, and the
+        // platform reports a gap for entries this device is holding all along.
+        Instant now = truncate(clock.instant());
+        this.publishedThrough = audit.lastDigestEnd()
+                .filter(end -> !end.isAfter(now))
+                .orElse(now);
     }
 
     /** The hour a pulse would report, given the current time. */

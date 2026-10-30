@@ -202,6 +202,40 @@ class AuditDigestPublisherTest {
         assertFalse(publishAt("2026-10-27T11:00:00Z").isEmpty());
     }
 
+    @Test
+    void aRestartedAgentResumesWhereTheLastDigestEnded() {
+        // The machine was switched off mid-hour: two entries were written after the last digest
+        // and the process stopped before the next hour closed. Starting the publisher at the
+        // current hour would leave those two entries out of every window, and the platform would
+        // report a gap for a device that lost nothing.
+        recordEntries(4);
+        publishAt("2026-10-27T10:00:00Z");
+        recordEntries(2);
+        String headAfterTheTail = this.audit.tail(1).get(0).hash();
+
+        // Next boot, hours later; the chain is reopened from the same directory.
+        this.clock.set(Instant.parse("2026-10-27T14:20:00Z"));
+        AuditDigestPublisher afterRestart =
+                new AuditDigestPublisher(this.audit, this.spool, GATEWAY, this.clock);
+
+        assertEquals(Instant.parse("2026-10-27T10:00:00Z"), afterRestart.publishedThrough(),
+                "the window resumes at the end of the last digest, not at the current hour");
+
+        Optional<AuditDigest> resumed = publishAt("2026-10-27T15:00:00Z");
+        assertTrue(resumed.isPresent());
+        assertEquals(Instant.parse("2026-10-27T10:00:00Z"), resumed.get().periodStart(),
+                "the tail written before the shutdown is inside the next window");
+        assertEquals(Instant.parse("2026-10-27T15:00:00Z"), resumed.get().periodEnd());
+        // Three, not two: the previous digest's own AUDIT_DIGEST entry belongs to the next window.
+        assertEquals(3, resumed.get().entryCount());
+        assertEquals(headAfterTheTail, resumed.get().chainHead());
+    }
+
+    @Test
+    void aFreshChainStillStartsAtTheCurrentHour() {
+        assertEquals(Instant.parse("2026-10-27T09:00:00Z"), this.publisher.publishedThrough());
+    }
+
     private void recordEntries(int count) {
         for (int i = 0; i < count; i++) {
             this.audit.append("TEST", "em-" + i, "entry " + i);

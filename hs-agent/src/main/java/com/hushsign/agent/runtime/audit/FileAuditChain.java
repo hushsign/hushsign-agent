@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Clock;
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -48,6 +49,10 @@ public final class FileAuditChain implements AuditLog {
     private static final String FIELD_DETAIL = "detail";
 
     private static final Logger LOG = LoggerFactory.getLogger(FileAuditChain.class);
+
+    /** How far back to look for the last digest; digests are hourly, entries are not. */
+    private static final int DIGEST_SEARCH_DEPTH = 500;
+    private static final String PERIOD_MARKER = "period ";
     private static final Pattern FILE_NAME = Pattern.compile("audit-(\\d{4})\\.jsonl");
 
     private final Path directory;
@@ -152,6 +157,34 @@ public final class FileAuditChain implements AuditLog {
             }
         }
         return ChainVerification.ok(seen, now);
+    }
+
+    /**
+     * Parses the window end out of the newest {@code AUDIT_DIGEST} entry (P7-S3).
+     *
+     * <p>The detail is written by {@code AuditDigestPublisher} in exactly one shape,
+     * {@code period <from>..<to> entries=..}, and this is the other end of that contract: the
+     * pair moved together, so the format has one writer and one reader.
+     */
+    @Override
+    public Optional<Instant> lastDigestEnd() {
+        for (AuditEntry entry : tail(DIGEST_SEARCH_DEPTH)) {
+            if (!"AUDIT_DIGEST".equals(entry.type()) || entry.detail() == null) {
+                continue;
+            }
+            int period = entry.detail().indexOf(PERIOD_MARKER);
+            int separator = entry.detail().indexOf("..", period + PERIOD_MARKER.length());
+            if (period < 0 || separator < 0) {
+                continue;
+            }
+            try {
+                return Optional.of(Instant.parse(
+                        entry.detail().substring(separator + 2, entry.detail().indexOf(' ', separator + 2)).trim()));
+            } catch (DateTimeException | IndexOutOfBoundsException _) {
+                LOG.warn("audit digest entry {} has an unreadable period: {}", entry.seq(), entry.detail());
+            }
+        }
+        return Optional.empty();
     }
 
     @Override

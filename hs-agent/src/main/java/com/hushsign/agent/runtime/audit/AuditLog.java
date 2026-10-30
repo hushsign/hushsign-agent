@@ -26,6 +26,18 @@ public interface AuditLog {
     /** Where the log is, for an operator who has to hand it over. */
     String location();
 
+    /**
+     * The end of the last digest window this device wrote, when it has written one.
+     *
+     * <p>The publisher starts its clock here rather than at the current hour. A digest window
+     * that restarts with the process leaves the entries between the last published window and
+     * the shutdown undigested forever, and the platform reports that hole as a gap - an incident
+     * the operator has to triage on a device that did nothing wrong.
+     */
+    default Optional<Instant> lastDigestEnd() {
+        return Optional.empty();
+    }
+
     /** Whether the last write succeeded; false here is an incident, not a warning. */
     boolean status();
 
