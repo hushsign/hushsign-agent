@@ -12,6 +12,7 @@ import com.hushsign.agent.gsm.serial.JSerialCommPortFactory;
 import com.hushsign.agent.gsm.serial.SerialPortFactory;
 import com.hushsign.agent.runtime.AgentRuntime;
 import com.hushsign.agent.runtime.admin.AdminClient;
+import com.hushsign.agent.runtime.execution.RecoveringPduSender;
 import com.hushsign.agent.runtime.admin.AdminServer;
 import com.hushsign.agent.runtime.admin.AdminSettings;
 import com.hushsign.agent.runtime.sensitive.IdentifierLogging;
@@ -21,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -82,12 +84,25 @@ public final class AgentMain {
         LOG.info("starting agent gateway={} operators={} pduSubmission={}",
                 config.gatewayId(), config.operators(), config.modems().pduSubmission());
 
-        Modem modem = claimModem(config, new JSerialCommPortFactory());
+        SerialPortFactory factory = new JSerialCommPortFactory();
+        Modem modem = claimModem(config, factory);
         if (LOG.isInfoEnabled()) {
             LOG.info("modem claimed: port={} state={}", modem.portName(), modem.state());
         }
 
-        AgentRuntime runtime = AgentRuntime.start(config, configFile, modem,
+        // A dongle re-enumerates on a hub reset or its own reboot, and the descriptor the agent
+        // opened dies with it. The configured /dev/serial/by-id/ path is what survives that, so it
+        // is re-resolved here rather than only at startup: without this the agent kept writing to
+        // a port that no longer existed until someone restarted the service.
+        AtomicReference<Modem> claimed = new AtomicReference<>(modem);
+        RecoveringPduSender sender = new RecoveringPduSender(
+                pdu -> claimed.get().sendPdu(pdu),
+                () -> {
+                    Modem fresh = reopenModem(config, factory, claimed);
+                    return fresh::sendPdu;
+                });
+
+        AgentRuntime runtime = AgentRuntime.start(config, configFile, modem, sender, claimed::get,
                 version(AgentMain.class.getPackage().getImplementationVersion()));
         if (rawIdentifiers) {
             runtime.auditLog().append("STARTUP", null,
@@ -214,6 +229,24 @@ public final class AgentMain {
     private static String version(String implementationVersion) {
         return implementationVersion == null || implementationVersion.isBlank()
                 ? "0.1.0-SNAPSHOT" : implementationVersion;
+    }
+
+    /**
+     * Releases the dead port and claims the modem again from the configured paths.
+     *
+     * <p>Called only after a send failed, i.e. rarely, and it performs the full init (SIM, PIN,
+     * registration, PDU mode) because a modem that reappeared on the bus is not ready to send.
+     */
+    static Modem reopenModem(AgentConfig config, SerialPortFactory factory, AtomicReference<Modem> claimed)
+            throws ModemException {
+        Modem stale = claimed.get();
+        if (stale != null) {
+            closeQuietly(stale);
+        }
+        Modem fresh = claimModem(config, factory);
+        claimed.set(fresh);
+        LOG.info("modem reopened: port={} state={}", fresh.portName(), fresh.state());
+        return fresh;
     }
 
     private static void closeQuietly(Modem modem) {

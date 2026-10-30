@@ -12,6 +12,7 @@ import com.hushsign.agent.runtime.cancel.CancellationStore;
 import com.hushsign.agent.runtime.cancel.CancellingEmissionHandler;
 import com.hushsign.agent.runtime.dedupe.DedupeStore;
 import com.hushsign.agent.runtime.execution.EmissionExecutor;
+import com.hushsign.agent.runtime.execution.PduSender;
 import com.hushsign.agent.runtime.heartbeat.Hashes;
 import com.hushsign.agent.runtime.heartbeat.HeartbeatProducer;
 import com.hushsign.agent.runtime.heartbeat.HeartbeatSource;
@@ -45,6 +46,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -76,7 +78,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
     private final CancellationConsumer cancellationConsumer;
     private final HeartbeatProducer heartbeat;
     private final long heartbeatIntervalMs;
-    private final Modem modem;
+    private final Supplier<Modem> modem;
     private final String agentVersion;
     private final PolicyEngine policy;
     private final Path policyFile;
@@ -94,7 +96,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
     private AgentRuntime(String gatewayId, Spool spool, KafkaSpoolSender sender,
                          List<EmissionConsumer> consumers, CancellationConsumer cancellationConsumer,
                          HeartbeatProducer heartbeat, HeartbeatSource heartbeatSource,
-                         long heartbeatIntervalMs, Modem modem, String agentVersion,
+                         long heartbeatIntervalMs, Supplier<Modem> modem, String agentVersion,
                          PolicyEngine policy, Path policyFile, Path configFile, FileAuditChain audit,
                          AdminState admin, AuditDigestPublisher digests) {
         this.gatewayId = gatewayId;
@@ -125,8 +127,24 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
      */
     public static AgentRuntime start(AgentConfig config, Path configFile, Modem modem,
                                      String agentVersion) {
+        Objects.requireNonNull(modem, "modem");
+        return start(config, configFile, modem, modem::sendPdu, () -> modem, agentVersion);
+    }
+
+    /**
+     * Starts the runtime with a sender that can reopen the modem.
+     *
+     * <p>{@code modemSupplier} is read for status and shutdown rather than captured once, so the
+     * heartbeat and the admin surface describe the modem the agent is actually using after a
+     * recovery instead of the one that died.
+     */
+    public static AgentRuntime start(AgentConfig config, Path configFile, Modem modem,
+                                     PduSender pduSender, Supplier<Modem> modemSupplier,
+                                     String agentVersion) {
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(modem, "modem");
+        Objects.requireNonNull(pduSender, "pduSender");
+        Objects.requireNonNull(modemSupplier, "modemSupplier");
 
         Path workDir = Path.of(config.workDir()).toAbsolutePath();
         ensureDirectory(workDir);
@@ -167,7 +185,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         EmissionHandler chain = new DedupingEmissionHandler(dedupe,
                 new CancellingEmissionHandler(cancels,
                         new PolicyCheckingEmissionHandler(policy,
-                                new EmissionExecutor(modem::sendPdu, transmissions),
+                                new EmissionExecutor(pduSender, transmissions),
                                 transmissions, audit, clock),
                         transmissions, clock));
 
@@ -178,13 +196,13 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         CancellationConsumer cancellationConsumer =
                 new CancellationConsumer(config.kafka(), config.gatewayId(), cancels);
 
-        HeartbeatSource source = new RuntimeHeartbeatSource(config, configFile, policy, policyFile, modem, consumers,
+        HeartbeatSource source = new RuntimeHeartbeatSource(config, configFile, policy, policyFile, modemSupplier, consumers,
                 Instant.now(), agentVersion);
         HeartbeatProducer heartbeat = new HeartbeatProducer(source, spool);
 
         AgentRuntime runtime = new AgentRuntime(config.gatewayId(), spool, sender, consumers,
                 cancellationConsumer, heartbeat, source, config.heartbeat().intervalSeconds() * 1000L,
-                modem, agentVersion, policy, policyFile, configFile, audit, adminState,
+                modemSupplier, agentVersion, policy, policyFile, configFile, audit, adminState,
                 new AuditDigestPublisher(audit, spool, config.gatewayId(), clock));
         runtime.startThreads();
         runtime.installShutdownHook();
@@ -335,10 +353,10 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
 
     @Override
     public List<ModemStatus> modems() {
-        var info = modem.getDeviceInformation();
+        var info = modem.get().getDeviceInformation();
         return List.of(new ModemStatus(
-                modem.portName(),
-                modem.state().name(),
+                modem.get().portName(),
+                modem.get().state().name(),
                 info == null ? "" : Sensitive.of(info.getImsi()).masked(),
                 info == null ? null : info.getManufacturer(),
                 info == null ? null : info.getModel(),
@@ -396,7 +414,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         flushOnce();
         sender.close();
         try {
-            modem.close();
+            modem.get().close();
         } catch (IOException | RuntimeException e) {
             LOG.warn("modem close failed: {}", e.getMessage());
         }
@@ -475,7 +493,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
 
         private final AgentConfig config;
         private final PolicyEngine policyEngine;
-        private final Modem modem;
+        private final Supplier<Modem> modem;
         private final List<EmissionConsumer> consumers;
         private final Instant startedAt;
         private final String agentVersion;
@@ -483,7 +501,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         private final String configHash;
 
         RuntimeHeartbeatSource(AgentConfig config, Path configFile, PolicyEngine policyEngine, Path policyFile,
-                               Modem modem, List<EmissionConsumer> consumers, Instant startedAt,
+                               Supplier<Modem> modem, List<EmissionConsumer> consumers, Instant startedAt,
                                String agentVersion) {
             this.config = config;
             this.policyEngine = policyEngine;
@@ -548,19 +566,20 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
 
         @Override
         public List<GatewayHeartbeat.ModemInfo> modems() {
-            var info = modem.getDeviceInformation();
-            String status = switch (modem.state()) {
+            Modem current = modem.get();
+            var info = current.getDeviceInformation();
+            String status = switch (current.state()) {
                 case READY -> GatewayHeartbeat.ModemInfo.Status.READY;
                 case BUSY -> GatewayHeartbeat.ModemInfo.Status.BUSY;
                 case DEGRADED -> GatewayHeartbeat.ModemInfo.Status.DEGRADED;
                 default -> GatewayHeartbeat.ModemInfo.Status.ERROR;
             };
             return List.of(new GatewayHeartbeat.ModemInfo(
-                    serialOf(modem),
+                    serialOf(current),
                     info == null ? null : info.getModel(),
                     info == null ? null : info.getManufacturer(),
                     status,
-                    modem.portName(),
+                    current.portName(),
                     null,
                     null));
         }
