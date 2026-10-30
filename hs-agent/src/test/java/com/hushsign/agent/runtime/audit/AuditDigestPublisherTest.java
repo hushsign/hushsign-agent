@@ -232,6 +232,23 @@ class AuditDigestPublisherTest {
     }
 
     @Test
+    void theResumePointIsTheNewestDigestNotTheFirstOne() {
+        // Two digests on the chain. Resuming from the first would re-cover the second hour and
+        // the platform would reject the next digest as overlapping one it already holds.
+        recordEntries(2);
+        publishAt("2026-10-27T10:00:00Z");
+        recordEntries(2);
+        publishAt("2026-10-27T11:00:00Z");
+
+        this.clock.set(Instant.parse("2026-10-27T14:20:00Z"));
+        AuditDigestPublisher afterRestart =
+                new AuditDigestPublisher(this.audit, this.spool, GATEWAY, this.clock);
+
+        assertEquals(Instant.parse("2026-10-27T11:00:00Z"), afterRestart.publishedThrough(),
+                "the newest digest ends the last window; resuming earlier would overlap it");
+    }
+
+    @Test
     void aFreshChainStillStartsAtTheCurrentHour() {
         assertEquals(Instant.parse("2026-10-27T09:00:00Z"), this.publisher.publishedThrough());
     }

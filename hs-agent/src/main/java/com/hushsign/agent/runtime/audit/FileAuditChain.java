@@ -168,7 +168,12 @@ public final class FileAuditChain implements AuditLog {
      */
     @Override
     public Optional<Instant> lastDigestEnd() {
-        for (AuditEntry entry : tail(DIGEST_SEARCH_DEPTH)) {
+        // tail() hands the entries back oldest first, so the newest match is the last one: reading
+        // forwards would return the *first* digest the device ever wrote and resume the window
+        // from there, re-covering every digest in between.
+        List<AuditEntry> recent = tail(DIGEST_SEARCH_DEPTH);
+        for (int i = recent.size() - 1; i >= 0; i--) {
+            AuditEntry entry = recent.get(i);
             if (!"AUDIT_DIGEST".equals(entry.type()) || entry.detail() == null) {
                 continue;
             }
