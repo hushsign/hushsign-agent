@@ -245,7 +245,9 @@ public final class AgentMain {
         }
         Modem fresh = claimModem(config, factory);
         claimed.set(fresh);
-        LOG.info("modem reopened: port={} state={}", fresh.portName(), fresh.state());
+        if (LOG.isInfoEnabled()) {
+            LOG.info("modem reopened: port={} state={}", fresh.portName(), fresh.state());
+        }
         return fresh;
     }
 

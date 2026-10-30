@@ -2,7 +2,7 @@ package com.hushsign.agent.runtime.execution;
 
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
+import com.hushsign.agent.gsm.modem.ModemException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -41,7 +41,7 @@ class RecoveringPduSenderTest {
         List<String> retried = new ArrayList<>();
         RecoveringPduSender sender = new RecoveringPduSender(
                 pdu -> {
-                    throw new IOException("send failed on ttyUSB1");
+                    throw new ModemException("send failed on ttyUSB1");
                 },
                 () -> {
                     reopened.incrementAndGet();
@@ -62,7 +62,7 @@ class RecoveringPduSenderTest {
         AtomicInteger reopened = new AtomicInteger();
         RecoveringPduSender sender = new RecoveringPduSender(
                 pdu -> {
-                    throw new IOException("port gone");
+                    throw new ModemException("port gone");
                 },
                 () -> {
                     reopened.incrementAndGet();
@@ -77,8 +77,8 @@ class RecoveringPduSenderTest {
 
     @Test
     void reportsBothTheSendAndTheReopenFailureWhenTheModemCannotComeBack() {
-        IOException dead = new IOException("send failed on ttyUSB1");
-        IOException missing = new IOException("none of the configured ports answered");
+        ModemException dead = new ModemException("send failed on ttyUSB1");
+        ModemException missing = new ModemException("none of the configured ports answered");
         RecoveringPduSender sender = new RecoveringPduSender(
                 pdu -> {
                     throw dead;
@@ -87,7 +87,7 @@ class RecoveringPduSenderTest {
                     throw missing;
                 });
 
-        Exception thrown = assertThrows(IOException.class, () -> sender.send(PDU));
+        ModemException thrown = assertThrows(ModemException.class, () -> sender.send(PDU));
         assertSame(missing, thrown, "the reopen failure is what the operator has to act on");
         assertEquals(1, thrown.getSuppressed().length);
         assertSame(dead, thrown.getSuppressed()[0], "the original send failure is kept as context");
@@ -99,16 +99,16 @@ class RecoveringPduSenderTest {
         AtomicInteger reopened = new AtomicInteger();
         RecoveringPduSender sender = new RecoveringPduSender(
                 pdu -> {
-                    throw new IOException("first");
+                    throw new ModemException("first");
                 },
                 () -> {
                     reopened.incrementAndGet();
                     return pdu -> {
-                        throw new IOException("second");
+                        throw new ModemException("second");
                     };
                 });
 
-        IOException thrown = assertThrows(IOException.class, () -> sender.send(PDU));
+        ModemException thrown = assertThrows(ModemException.class, () -> sender.send(PDU));
         assertEquals("second", thrown.getMessage());
         assertTrue(thrown.getSuppressed()[0].getMessage().contains("first"));
         assertEquals(1, reopened.get(), "one reopen and one retry per send, never a spin");
@@ -118,7 +118,7 @@ class RecoveringPduSenderTest {
     void reportsTheFailureWhenTheReopenedModemRejectsThePdu() {
         RecoveringPduSender sender = new RecoveringPduSender(
                 pdu -> {
-                    throw new IOException("port gone");
+                    throw new ModemException("port gone");
                 },
                 () -> pdu -> {
                     throw new IllegalStateException("modem rejected the PDU");

@@ -173,23 +173,37 @@ public final class FileAuditChain implements AuditLog {
         // from there, re-covering every digest in between.
         List<AuditEntry> recent = tail(DIGEST_SEARCH_DEPTH);
         for (int i = recent.size() - 1; i >= 0; i--) {
-            AuditEntry entry = recent.get(i);
-            if (!"AUDIT_DIGEST".equals(entry.type()) || entry.detail() == null) {
-                continue;
-            }
-            int period = entry.detail().indexOf(PERIOD_MARKER);
-            int separator = entry.detail().indexOf("..", period + PERIOD_MARKER.length());
-            if (period < 0 || separator < 0) {
-                continue;
-            }
-            try {
-                return Optional.of(Instant.parse(
-                        entry.detail().substring(separator + 2, entry.detail().indexOf(' ', separator + 2)).trim()));
-            } catch (DateTimeException | IndexOutOfBoundsException _) {
-                LOG.warn("audit digest entry {} has an unreadable period: {}", entry.seq(), entry.detail());
+            Optional<Instant> end = digestEndOf(recent.get(i));
+            if (end.isPresent()) {
+                return end;
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * The window end carried by one entry, or empty when the entry is not a digest or its detail
+     * does not parse. Kept out of the loop above so the search has one reason to move on rather
+     * than a continue per rejection, which is where a scan like this usually goes wrong.
+     */
+    private Optional<Instant> digestEndOf(AuditEntry entry) {
+        if (!"AUDIT_DIGEST".equals(entry.type()) || entry.detail() == null) {
+            return Optional.empty();
+        }
+        String detail = entry.detail();
+        int period = detail.indexOf(PERIOD_MARKER);
+        int separator = period < 0 ? -1 : detail.indexOf("..", period + PERIOD_MARKER.length());
+        int end = separator < 0 ? -1 : detail.indexOf(' ', separator + 2);
+        if (period < 0 || separator < 0 || end < 0) {
+            LOG.warn("audit digest entry {} has an unreadable period: {}", entry.seq(), detail);
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(Instant.parse(detail.substring(separator + 2, end).trim()));
+        } catch (DateTimeException _) {
+            LOG.warn("audit digest entry {} has an unreadable period: {}", entry.seq(), detail);
+            return Optional.empty();
+        }
     }
 
     @Override

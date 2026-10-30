@@ -164,6 +164,28 @@ class FileAuditChainTest {
     }
 
     @Test
+    void anUnreadableDigestPeriodDoesNotBecomeTheResumePoint(@TempDir Path dir) {
+        // The publisher resumes its window from this value. A digest entry whose period does not
+        // parse must be skipped, not guessed at: resuming from garbage would either republish a
+        // window the platform already holds or leave the tail uncovered.
+        FileAuditChain chain = chain(dir);
+        chain.append("AUDIT_DIGEST", null, "period 2026-10-27T09:00:00Z.. entries=3");
+        chain.append("AUDIT_DIGEST", null, "period 2026-10-27T09:00:00Z..2026-10-27T10:00:00Z entries=3");
+
+        assertEquals(java.util.Optional.of(Instant.parse("2026-10-27T10:00:00Z")),
+                chain.lastDigestEnd());
+    }
+
+    @Test
+    void aChainWithoutAUsableDigestHasNoResumePoint(@TempDir Path dir) {
+        FileAuditChain chain = chain(dir);
+        fill(chain, 2);
+        chain.append("AUDIT_DIGEST", null, "period nonsense");
+
+        assertTrue(chain.lastDigestEnd().isEmpty());
+    }
+
+    @Test
     void anEntryCarriesTheHashOfTheOneBefore(@TempDir Path dir) {
         FileAuditChain chain = chain(dir);
         fill(chain, 2);

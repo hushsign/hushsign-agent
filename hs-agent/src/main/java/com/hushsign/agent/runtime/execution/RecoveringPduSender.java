@@ -1,9 +1,12 @@
 package com.hushsign.agent.runtime.execution;
 
+import com.hushsign.agent.gsm.modem.ModemException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Sends PDUs, and when the port has gone away underneath the agent, reopens the modem and tries
@@ -34,7 +37,7 @@ public final class RecoveringPduSender implements PduSender {
     /** What this class needs from a modem: send one PDU. */
     @FunctionalInterface
     public interface Channel {
-        int sendPdu(String pduHex) throws Exception;
+        int sendPdu(String pduHex) throws ModemException;
     }
 
     /**
@@ -43,28 +46,29 @@ public final class RecoveringPduSender implements PduSender {
      */
     @FunctionalInterface
     public interface Reopen {
-        Channel open() throws Exception;
+        Channel open() throws ModemException;
     }
 
     private final Reopen reopen;
-    private volatile Channel channel;
-    private volatile int recoveries;
+    private final AtomicReference<Channel> channel;
+    private final AtomicInteger recoveries = new AtomicInteger();
 
     public RecoveringPduSender(Channel initial, Reopen reopen) {
-        this.channel = Objects.requireNonNull(initial, "initial");
+        this.channel = new AtomicReference<>(Objects.requireNonNull(initial, "initial"));
         this.reopen = Objects.requireNonNull(reopen, "reopen");
     }
 
     @Override
-    public int send(String pduHex) throws Exception {
-        Channel current = channel;
+    public int send(String pduHex) throws ModemException {
+        Channel current = channel.get();
         try {
             return current.sendPdu(pduHex);
         } catch (Exception failure) {
             Channel replacement = replacementAfter(current, failure);
             try {
                 int index = replacement.sendPdu(pduHex);
-                LOG.info("send succeeded after reopening the modem ({} recovery/recoveries so far)", recoveries);
+                LOG.info("send succeeded after reopening the modem ({} recovery/recoveries so far)",
+                        recoveries.get());
                 return index;
             } catch (Exception retryFailure) {
                 // Both causes matter: the first says the port died, the second says the fresh one
@@ -80,18 +84,19 @@ public final class RecoveringPduSender implements PduSender {
      * moment: the emission consumer is single-threaded per operator, but the probe path and a
      * future parallel caller must not open two ports.
      */
-    private synchronized Channel replacementAfter(Channel failed, Exception failure) throws Exception {
-        if (channel != failed) {
+    private synchronized Channel replacementAfter(Channel failed, Exception failure) throws ModemException {
+        Channel current = channel.get();
+        if (current != failed) {
             // Another caller already replaced the dead channel while this one was failing.
-            return channel;
+            return current;
         }
         try {
             Channel replacement = reopen.open();
-            channel = replacement;
-            recoveries++;
+            channel.set(replacement);
+            recoveries.incrementAndGet();
             LOG.warn("reopened the modem after a failed send: {}", failure.getMessage());
             return replacement;
-        } catch (Exception reopenFailure) {
+        } catch (ModemException reopenFailure) {
             reopenFailure.addSuppressed(failure);
             throw reopenFailure;
         }
@@ -99,6 +104,6 @@ public final class RecoveringPduSender implements PduSender {
 
     /** How many times the port has been reopened; reported by tests and the admin surface. */
     public int recoveries() {
-        return recoveries;
+        return recoveries.get();
     }
 }
