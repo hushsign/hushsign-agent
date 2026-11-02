@@ -9,6 +9,9 @@ import java.io.IOException;
  */
 public final class JSerialCommSerialPort implements SerialPort {
 
+    /** How long one write may spend draining into the driver before it is called short. */
+    private static final long WRITE_TIMEOUT_MS = 5_000;
+
     private final com.fazecast.jSerialComm.SerialPort delegate;
 
     JSerialCommSerialPort(com.fazecast.jSerialComm.SerialPort delegate) {
@@ -48,11 +51,30 @@ public final class JSerialCommSerialPort implements SerialPort {
 
     @Override
     public void writeBytes(byte[] bytes) throws IOException {
-        int written = delegate.writeBytes(bytes, bytes.length);
-        if (written != bytes.length) {
-            // a short (or failed) write would silently corrupt a PDU
-            throw new IOException("short write on serial port " + name()
-                    + ": " + written + "/" + bytes.length);
+        int offset = 0;
+        // jSerialComm reports how much of the buffer it accepted, and a driver with a full buffer
+        // accepts part of it. Throwing on that turned "the modem is briefly busy" into "the modem
+        // is dead" - which is exactly how a working device was declared unreachable during the
+        // 2026-11-02 field test. A bounded retry is what a blocking write is for.
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(WRITE_TIMEOUT_MS);
+        while (offset < bytes.length) {
+            byte[] remaining = offset == 0 ? bytes
+                    : java.util.Arrays.copyOfRange(bytes, offset, bytes.length);
+            int written = delegate.writeBytes(remaining, remaining.length);
+            if (written > 0) {
+                offset += written;
+                continue;
+            }
+            if (System.nanoTime() > deadline) {
+                throw new IOException("short write on serial port " + name() + ": " + offset + "/"
+                        + bytes.length + (delegate.isOpen() ? "" : " (the port is closed: the device re-enumerated)"));
+            }
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("interrupted writing to serial port " + name(), e);
+            }
         }
     }
 
