@@ -140,6 +140,17 @@ class AgentMainTest {
     }
 
     @Test
+    void theFailureSaysWhatTheConfiguredPathResolvedTo() throws Exception {
+        // "serial ports present: [ttyUSB1, ttyUSB2, ttyUSB3]" next to "none of the configured ports
+        // answered" reads as a contradiction: the device is right there. It is not one - the
+        // configured path is a by-id link, and the link is what failed. The message has to say so.
+        String message = AgentMain.noConfiguredPortAnswered(
+                List.of("/dev/serial/by-id/usb-does-not-exist-port0"), List.of("ttyUSB1"));
+
+        assertTrue(message.contains("does not exist right now"), message);
+        assertTrue(message.contains("/dev/serial/by-id/usb-does-not-exist-port0"), message);
+    }
+    @Test
     void anIndexedDeviceNameGetsTheByidHint() {
         String message = AgentMain.noConfiguredPortAnswered(
                 List.of("/dev/ttyUSB0"), List.of("/dev/ttyUSB1"));

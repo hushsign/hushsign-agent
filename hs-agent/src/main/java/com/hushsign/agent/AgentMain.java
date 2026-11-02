@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
@@ -227,12 +228,39 @@ public final class AgentMain {
      */
     static String noConfiguredPortAnswered(List<String> configured, List<String> present) {
         String message = "none of the configured ports answered: " + configured
-                + "; serial ports present: " + present;
+                + "; serial ports present: " + present
+                // Saying which ports the machine has is only half the story, and the half that
+                // reads as "but they are right there". A by-id link is a pointer: it can be absent
+                // while the device is on the bus, or dangle at a ttyUSB name that this process
+                // still holds open. Naming what the configured path actually is saves the next
+                // person the twenty minutes it cost here.
+                + configuredState(configured);
         if (configured.stream().anyMatch(AgentMain::isEnumerationOrderPath)) {
             message += ". A /dev/ttyUSB<n> name is an enumeration order, not a device: pin the"
                     + " /dev/serial/by-id/ path instead and it survives the next replug";
         }
         return message;
+    }
+
+    /** What each configured path resolves to right now, so a failure says which kind it was. */
+    private static String configuredState(List<String> configured) {
+        StringBuilder state = new StringBuilder();
+        for (String port : configured) {
+            Path path = Path.of(port);
+            state.append("; ").append(port);
+            if (!Files.exists(path)) {
+                state.append(" does not exist right now");
+                continue;
+            }
+            try {
+                Path resolved = path.toRealPath();
+                state.append(" -> ").append(resolved.getFileName());
+                state.append(Files.isReadable(resolved) ? " (readable)" : " (not readable)");
+            } catch (IOException e) {
+                state.append(" cannot be resolved: ").append(e.getMessage());
+            }
+        }
+        return state.toString();
     }
 
     private static boolean isEnumerationOrderPath(String port) {
