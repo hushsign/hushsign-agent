@@ -48,6 +48,34 @@ editing it, and the startup line in the journal prints the policy that is actual
 Ceilings still apply afterwards: `caps.perTargetPerHour` is what stops a mistyped cadence turning
 into a burst against one number.
 
+## The hourly caps ("target +4070… has reached its 6-per-hour cap")
+
+That refusal is `caps` in the same `policy.yaml`, and it is the gateway's own ceiling - the
+platform does not set it, cannot change it, and only displays what the heartbeat reports:
+
+```yaml
+caps:
+  perTargetPerHour: 6        # one subscriber; 0 means no ceiling
+  perOperatorPerHour: 120    # one network (MCC-MNC)
+  perGatewayPerHour: 300     # the whole device
+```
+
+Three properties worth knowing before changing a number here:
+
+- **All three are checked, target first.** A command must pass every ceiling; if one refuses,
+  the counts taken for the others are given back, so a refused command costs nothing.
+- **A refused command is not a bug.** It exists so a mistyped cadence cannot turn into a burst
+  against one subscriber - a 10-second schedule is six sends in the first minute, which is the
+  entire hourly allowance for that target. That is the ceiling doing its job.
+- **A failed send still counts.** The cap bounds attempts, not deliveries, because the thing it
+  protects is the subscriber's network, not our bookkeeping. With a broken modem, six failed
+  attempts exhaust the hour just as six delivered messages would.
+
+The count is per **clock hour (UTC)**: `epochSecond / 3600`, not a rolling window. It is persisted
+in `policy-countr*.journal` under the work directory and replayed at startup, so restarting the
+agent - or a power cut - does not hand out a fresh allowance. A clock rewound past an hour
+boundary reuses the bucket it left rather than opening a new one.
+
 Requirements: Java 25 (wrapper bundles Maven).
 
 VS Code: the Java extension (`redhat.java`) reports "Project configuration is not up-to-date
