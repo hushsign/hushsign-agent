@@ -80,6 +80,20 @@ class AgentMainTest {
     }
 
     @Test
+    void aRecoveryAttemptIsImpatientComparedWithAStartupClaim() throws Exception {
+        // The send path is the only consumer: a recovery inside it blocks every queued command, so
+        // its timeouts are the difference between a stall of seconds and one of ninety. Measured
+        // on 2026-11-02: one unplug stalled the agent for 87 s against the startup profile.
+        AgentConfig config = configWithPorts(List.of("/dev/serial/by-id/dongle"));
+
+        int configured = AgentMain.modemConfig(config).responseTimeoutMs();
+        int recovery = AgentMain.recoveryModemConfig(config).responseTimeoutMs();
+        assertTrue(recovery <= configured, "a recovery never waits longer than the installation asked");
+        assertTrue(recovery <= 8_000, "and never longer than eight seconds, whatever the config says");
+        assertTrue(AgentMain.recoveryModemConfig(config).probeAttempts()
+                <= Math.min(2, AgentMain.modemConfig(config).probeAttempts()), "at most two attempts");
+    }
+    @Test
     void reopeningReleasesTheDeadPortAndPublishesTheFreshModem() throws Exception {
         // The case that took a gateway off the air: the dongle re-enumerated, the agent kept the
         // descriptor it had claimed at startup, and every send failed on a port that no longer

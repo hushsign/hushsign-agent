@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.Arrays;
 import java.util.List;
@@ -40,6 +41,10 @@ import java.util.Optional;
 public final class AgentMain {
 
     private static final Logger LOG = LoggerFactory.getLogger(AgentMain.class);
+
+    /** A recovery attempt is impatient on purpose; see {@link #recoveryModemConfig}. */
+    private static final int RECOVERY_RESPONSE_TIMEOUT_MS = 8_000;
+    private static final int RECOVERY_PROBE_ATTEMPTS = 2;
 
     private AgentMain() {
     }
@@ -176,7 +181,12 @@ public final class AgentMain {
      * that cannot read its SIM must never look READY (P1-S14).
      */
     static Modem claimModem(AgentConfig config, SerialPortFactory factory) throws ModemException {
-        ModemConfig modemConfig = modemConfig(config);
+        return claimModem(config, factory, modemConfig(config));
+    }
+
+    static Modem claimModem(AgentConfig config, SerialPortFactory factory, ModemConfig modemConfig)
+            throws ModemException {
+        Objects.requireNonNull(modemConfig, "modemConfig");
         if (!config.modems().autoScan()) {
             for (String port : config.modems().ports()) {
                 try {
@@ -222,6 +232,34 @@ public final class AgentMain {
         return port.matches("/dev/tty(USB|ACM)\\d+");
     }
 
+    /**
+     * The profile used when re-claiming a modem that has already failed.
+     *
+     * <p>The steady-state profile waits 30 s per command and tries three times, which is right for
+     * a modem that is expected to answer and wrong for a port that has just vanished: the send
+     * path is the only consumer, so a recovery attempt there blocks every queued command behind
+     * it. On 2026-11-02 one unplug stalled the agent for 87 s while the platform kept emitting a
+     * command every 10 s - the backlog then aged out against the 120 s freshness limit and was
+     * dropped. Eight seconds and two attempts still rides out a slow probe and a device that is
+     * genuinely gone is now known to be gone in under twenty.
+     *
+     * <p>Both are ceilings, not settings: an installation that configured a shorter timeout keeps
+     * it, because patience is the only thing being taken away here.
+     */
+    static ModemConfig recoveryModemConfig(AgentConfig config) {
+        AgentConfig.ModemsConfig modems = config.modems();
+        return ModemConfig.builder(config.gatewayId())
+                .baudRate(modems.baudRate())
+                .responseTimeoutMs(Math.min(modems.responseTimeoutMs(), RECOVERY_RESPONSE_TIMEOUT_MS))
+                .commandWaitMs(modems.commandWaitMs())
+                .pollWaitMs(modems.pollWaitMs())
+                .probeAttempts(Math.min(modems.probeAttempts(), RECOVERY_PROBE_ATTEMPTS))
+                .maxConsecutiveErrors(modems.maxConsecutiveErrors())
+                .simPin(modems.simPin())
+                .pduSubmission(PduSubmission.valueOf(modems.pduSubmission()))
+                .build();
+    }
+
     static ModemConfig modemConfig(AgentConfig config) {
         AgentConfig.ModemsConfig modems = config.modems();
         return ModemConfig.builder(config.gatewayId())
@@ -253,7 +291,7 @@ public final class AgentMain {
         if (stale != null) {
             closeQuietly(stale);
         }
-        Modem fresh = claimModem(config, factory);
+        Modem fresh = claimModem(config, factory, recoveryModemConfig(config));
         claimed.set(fresh);
         if (LOG.isInfoEnabled()) {
             LOG.info("modem reopened: port={} state={}", fresh.portName(), fresh.state());
