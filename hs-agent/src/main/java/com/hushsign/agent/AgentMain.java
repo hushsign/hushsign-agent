@@ -109,6 +109,7 @@ public final class AgentMain {
         // The watchdog is the independent reason to look.
         ModemWatchdog watchdog = new ModemWatchdog(
                 () -> claimed.get().state() == ModemState.READY,
+                () -> claimed.get().ping(),
                 () -> reopenModem(config, factory, claimed));
 
         AgentRuntime runtime = AgentRuntime.start(config, configFile, modem, sender, claimed::get,

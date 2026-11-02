@@ -21,7 +21,10 @@ import java.util.Objects;
  * <p>So recovery is its own reason to touch the port, on its own clock:
  *
  * <ul>
- *   <li>a modem that says it is READY is left alone - no polling of a healthy port;</li>
+ *   <li>a modem that says it is READY is asked once whether it is still there, because nothing
+ *       else touches the port when no command is being sent: after a re-enumeration the old
+ *       handle keeps claiming READY about a device node that no longer exists, and the heartbeat
+ *       then reports a healthy modem that cannot send;</li>
  *   <li>a modem that is DEGRADED, ERROR or otherwise not ready gets one reopen attempt per tick,
  *       which is also the probe: a reopen runs the full init, so success means a working modem
  *       rather than a port that merely opened;</li>
@@ -33,10 +36,22 @@ public final class ModemWatchdog {
 
     private static final Logger LOG = LoggerFactory.getLogger(ModemWatchdog.class);
 
-    /** Whether the modem in use is fit to send. Reads the live state, not a cached one. */
+    /**
+     * Whether the modem in use claims to be fit to send. Cheap and local: this is the state the
+     * object holds, not a conversation with the hardware.
+     */
     @FunctionalInterface
     public interface Ready {
         boolean isReady();
+    }
+
+    /**
+     * Asks the hardware. Only called for a modem that claims READY, so a BUSY port is never
+     * interrupted mid-send.
+     */
+    @FunctionalInterface
+    public interface Probe {
+        boolean responds();
     }
 
     /** Claims the modem again, replacing whatever the runtime is holding. */
@@ -46,10 +61,17 @@ public final class ModemWatchdog {
     }
 
     private final Ready ready;
+    private final Probe probe;
     private final Recovery recovery;
 
+    /** A watchdog that trusts the reported state - for callers with no port to check. */
     public ModemWatchdog(Ready ready, Recovery recovery) {
+        this(ready, () -> true, recovery);
+    }
+
+    public ModemWatchdog(Ready ready, Probe probe, Recovery recovery) {
         this.ready = Objects.requireNonNull(ready, "ready");
+        this.probe = Objects.requireNonNull(probe, "probe");
         this.recovery = Objects.requireNonNull(recovery, "recovery");
     }
 
@@ -59,8 +81,12 @@ public final class ModemWatchdog {
      * @return true when this call put a broken modem back into service
      */
     public boolean checkOnce() {
-        if (ready.isReady()) {
+        boolean claimsReady = ready.isReady();
+        if (claimsReady && probe.responds()) {
             return false;
+        }
+        if (claimsReady) {
+            LOG.warn("modem watchdog: the modem claims READY but did not answer, reopening it");
         }
         try {
             recovery.reopen();

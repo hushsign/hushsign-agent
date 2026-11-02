@@ -58,6 +58,26 @@ class ModemTest {
     }
 
     @Test
+    void pingAsksTheModemAndDegradesItWhenItDoesNotAnswer() throws Exception {
+        // The watchdog uses this to catch a handle that still says READY about a node that is
+        // gone: nothing writes to the port when no command is being sent, so the state alone
+        // cannot be trusted.
+        TestSerialPort port = new TestSerialPort("COM3");
+        port.scriptResponse("OK\r\n");
+        port.scriptResponse("356789123456789\r\nOK\r\n");
+        Modem modem = Modem.open(port, fastConfig());
+
+        port.scriptResponse("OK\r\n");
+        assertTrue(modem.ping(), "a modem that answers is alive");
+        assertEquals(ModemState.READY, modem.state());
+
+        // now the port goes quiet, as a dead device node does
+        port.scriptResponse("");
+        assertFalse(modem.ping());
+        assertEquals(ModemState.DEGRADED, modem.state(), "a failed ping degrades it like a failed send");
+        assertFalse(modem.ping(), "a degraded modem is not asked again");
+    }
+    @Test
     void noisePortIsRejectedAfterProbeAttempts() {
         TestSerialPort port = new TestSerialPort("COM1");
 

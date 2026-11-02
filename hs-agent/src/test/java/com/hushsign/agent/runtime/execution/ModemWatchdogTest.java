@@ -47,6 +47,41 @@ class ModemWatchdogTest {
     }
 
     @Test
+    void reopensAModemThatClaimsReadyButDoesNotAnswer() {
+        // The failure that made the heartbeat lie: after a re-enumeration the old handle still
+        // says READY about a device node that is gone, so nothing looks at it - and the platform
+        // is told a healthy modem cannot send.
+        AtomicInteger reopened = new AtomicInteger();
+        ModemWatchdog watchdog = new ModemWatchdog(() -> true, () -> false, reopened::incrementAndGet);
+
+        assertTrue(watchdog.checkOnce());
+        assertEquals(1, reopened.get());
+    }
+
+    @Test
+    void doesNotAskThePortWhenTheModemIsNotReady() {
+        AtomicInteger probes = new AtomicInteger();
+        AtomicInteger reopened = new AtomicInteger();
+        ModemWatchdog watchdog = new ModemWatchdog(() -> false, () -> {
+            probes.incrementAndGet();
+            return true;
+        }, reopened::incrementAndGet);
+
+        assertTrue(watchdog.checkOnce());
+        assertEquals(0, probes.get(), "a DEGRADED modem goes straight to recovery");
+        assertEquals(1, reopened.get());
+    }
+
+    @Test
+    void leavesAReadyModemThatAnswersAlone() {
+        AtomicInteger reopened = new AtomicInteger();
+        ModemWatchdog watchdog = new ModemWatchdog(() -> true, () -> true, reopened::incrementAndGet);
+
+        assertFalse(watchdog.checkOnce());
+        assertEquals(0, reopened.get());
+    }
+
+    @Test
     void stopsTryingOnceTheModemIsBack() {
         AtomicInteger reopened = new AtomicInteger();
         boolean[] ready = {false};

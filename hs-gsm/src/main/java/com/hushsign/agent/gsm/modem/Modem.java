@@ -198,6 +198,37 @@ public final class Modem implements ModemContext, AutoCloseable {
         return state;
     }
 
+    /**
+     * Asks the modem whether it is still there.
+     *
+     * <p>State alone cannot answer that. Nothing writes to the port unless a command is being
+     * sent, so after the dongle re-enumerates the old object keeps saying READY about a device
+     * node that no longer exists - the agent then reports a healthy modem in the heartbeat while
+     * every send fails, which is the worst answer it can give an operator. This is a one-command
+     * check the watchdog can run on a modem that claims to be fine.
+     *
+     * <p>A modem that is BUSY is not asked: a send in progress owns the port, and a failure here
+     * would blame the modem for being used. A failed check degrades the modem exactly like a
+     * failed send, so the next watchdog tick takes the recovery path.
+     *
+     * @return true only when the modem answered
+     */
+    public synchronized boolean ping() {
+        if (state != ModemState.READY) {
+            return false;
+        }
+        try {
+            return driver.write("AT\r").isResponseOk();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            recordFailure();
+            return false;
+        } catch (Exception e) {
+            recordFailure();
+            return false;
+        }
+    }
+
     public String portName() {
         return port.name();
     }
