@@ -27,6 +27,20 @@ Requirements
   * Java 21 (JAVA_HOME, or java on PATH)
   * a modem on /dev/ttyUSB* and membership of the dialout group
   * reachability to the Kafka brokers in agent.yaml
+  * a NATIVE USB port. Do not pass the modem through to a virtual machine.
+
+That last one is not a preference. Passing a Huawei K3765 through QEMU (`usb3: host=<port>`)
+looked workable for hours and then failed permanently: the stick re-enumerates under transmit
+load, QEMU keeps its claim on the address it opened and never delivers the device to the guest
+again, and the guest is left with no /dev/ttyUSB at all. Chasing that produced a week of wrong
+conclusions - power, cabling, EMI, a dying modem - because every one of them looks the same from
+inside the guest. Measured side by side on 2026-11-02, same stick, same build, 10 s cadence:
+
+    behind Proxmox USB passthrough : 0 accepted / 163 failed, 7 USB resets in 5 min
+    native USB port (Raspberry Pi)  : 42 accepted / 0 failed, 0 USB resets in 7 min
+
+A small always-on host - a Pi, a NUC - is the deployment this agent is written for. Also mask
+ModemManager on that host: it probes AT ports and resets the device underneath the agent.
 
 Pin the modem by its stable path, not by number:
 
