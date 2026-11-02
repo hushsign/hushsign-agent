@@ -34,9 +34,16 @@ public final class JSerialCommSerialPort implements SerialPort {
 
     @Override
     public void close() {
-        if (delegate.isOpen()) {
-            delegate.closePort();
-        }
+        // Unconditionally, and deliberately not guarded by isOpen().
+        //
+        // After the dongle re-enumerates, jSerialComm reports the handle it gave us as not open -
+        // the node it pointed at is gone - while this process still holds the file descriptor.
+        // Skipping the close then leaks the descriptor, and because the same path name comes back
+        // (ttyUSB1 gone, ttyUSB1 again), opening it a second time in the same JVM fails: the agent
+        // answered every reopen with "cannot open ttyUSB1" until the service was restarted, which
+        // made automatic modem recovery impossible in exactly the case it exists for. closePort()
+        // on a handle that is already closed is a no-op, so there is nothing to protect against.
+        delegate.closePort();
     }
 
     @Override
