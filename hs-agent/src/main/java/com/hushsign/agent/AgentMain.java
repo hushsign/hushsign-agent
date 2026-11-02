@@ -13,7 +13,6 @@ import com.hushsign.agent.gsm.serial.JSerialCommPortFactory;
 import com.hushsign.agent.gsm.serial.SerialPortFactory;
 import com.hushsign.agent.runtime.AgentRuntime;
 import com.hushsign.agent.runtime.admin.AdminClient;
-import com.hushsign.agent.runtime.execution.ModemWatchdog;
 import com.hushsign.agent.runtime.execution.RecoveringPduSender;
 import com.hushsign.agent.runtime.admin.AdminServer;
 import com.hushsign.agent.runtime.admin.AdminSettings;
@@ -71,6 +70,15 @@ public final class AgentMain {
             // wrapper or systemd unit can tell it apart from a crash.
             LOG.error("{}", e.getMessage());
             System.exit(2);
+        } catch (ModemException e) {
+            // No modem is an operational condition, not a crash - but the process has to end so
+            // systemd's Restart=always can try again. It used to propagate out of main() and the
+            // JVM stayed up on a non-daemon serial reader thread: the unit read "active (running)"
+            // for an agent whose main thread was already dead, and the gateway quietly sent
+            // nothing until somebody looked. A gateway boots before its dongle often enough that
+            // this is the normal path after a reboot.
+            LOG.error("the agent cannot start: {}", e.getMessage());
+            System.exit(3);
         }
     }
 
@@ -107,18 +115,17 @@ public final class AgentMain {
                 () -> {
                     Modem fresh = reopenModem(config, factory, claimed);
                     return fresh::sendPdu;
-                });
+                },
+                () -> claimed.get().state() == ModemState.READY,
+                () -> claimed.get().ping());
 
         // The executor retries a failed send, but only when a command reaches the modem - and the
         // policy gate sits before that, so a capped or idle gateway never notices a port that died.
-        // The watchdog is the independent reason to look.
-        ModemWatchdog watchdog = new ModemWatchdog(
-                () -> claimed.get().state() == ModemState.READY,
-                () -> claimed.get().ping(),
-                () -> reopenModem(config, factory, claimed));
-
+        // The sender's own check is the independent reason to look; the runtime only supplies the
+        // clock, because the check has to run under the same lock as a send.
         AgentRuntime runtime = AgentRuntime.start(config, configFile, modem, sender, claimed::get,
-                watchdog, version(AgentMain.class.getPackage().getImplementationVersion()));
+                sender::recoverIfUnhealthy,
+                version(AgentMain.class.getPackage().getImplementationVersion()));
         if (rawIdentifiers) {
             runtime.auditLog().append("STARTUP", null,
                     "log identifiers = raw: agent.log carries subscriber identifiers in clear");

@@ -45,6 +45,10 @@ public final class JSerialModemDriver extends AbstractModemDriver {
 
         reader = new PollReader();
         reader.setName("hs-gsm-poll-" + port.name());
+        // Daemon: this thread exists to serve the port, so it must not decide how long the process
+        // lives. Non-daemon, it kept a dead agent's JVM alive after a failed start and the service
+        // looked healthy while doing nothing.
+        reader.setDaemon(true);
         reader.start();
     }
 

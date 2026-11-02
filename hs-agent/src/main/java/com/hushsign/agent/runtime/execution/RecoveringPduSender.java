@@ -53,13 +53,41 @@ public final class RecoveringPduSender implements PduSender {
     private final AtomicReference<Channel> channel;
     private final AtomicInteger recoveries = new AtomicInteger();
 
-    public RecoveringPduSender(Channel initial, Reopen reopen) {
+    /**
+     * Whether the modem in use claims to be fit to send. Cheap and local: the state the object
+     * holds, not a conversation with the hardware.
+     */
+    @FunctionalInterface
+    public interface Ready {
+        boolean isReady();
+    }
+
+    /**
+     * Asks the hardware. Only called for a modem that claims READY, so a send in progress is
+     * never interrupted.
+     */
+    @FunctionalInterface
+    public interface Probe {
+        boolean responds();
+    }
+
+    private final Ready ready;
+    private final Probe probe;
+
+    public RecoveringPduSender(Channel initial, Reopen reopen, Ready ready, Probe probe) {
         this.channel = new AtomicReference<>(Objects.requireNonNull(initial, "initial"));
         this.reopen = Objects.requireNonNull(reopen, "reopen");
+        this.ready = Objects.requireNonNull(ready, "ready");
+        this.probe = Objects.requireNonNull(probe, "probe");
+    }
+
+    /** A sender with no health check of its own: it only recovers when a send fails. */
+    public RecoveringPduSender(Channel initial, Reopen reopen) {
+        this(initial, reopen, () -> true, () -> true);
     }
 
     @Override
-    public int send(String pduHex) throws ModemException {
+    public synchronized int send(String pduHex) throws ModemException {
         Channel current = channel.get();
         try {
             return current.sendPdu(pduHex);
@@ -99,6 +127,42 @@ public final class RecoveringPduSender implements PduSender {
         } catch (ModemException reopenFailure) {
             reopenFailure.addSuppressed(failure);
             throw reopenFailure;
+        }
+    }
+
+    /**
+     * Checks the modem and puts it back into service if it has gone.
+     *
+     * <p><b>Why this lives here and is synchronized.</b> A reopen replaces the {@code Modem}, and
+     * with it the lock that serialises access to the port - so a recovery running beside a send
+     * drives the same serial device through two handles. On 2026-11-02 a thread dump caught
+     * exactly that: the consumer inside the driver's write while the watchdog was inside its
+     * response reader, both talking to one dongle, and the send stalled until the two AT
+     * conversations had each timed out. Holding one lock on the sender, which outlives every
+     * modem it opens, makes "one port, one conversation" true again: a send in progress delays
+     * the check, and a reopen delays the next send, which is what a single serial line means.
+     *
+     * @return true when this call put a broken modem back into service
+     */
+    public synchronized boolean recoverIfUnhealthy() {
+        boolean claimsReady = ready.isReady();
+        if (claimsReady && probe.responds()) {
+            return false;
+        }
+        if (claimsReady) {
+            LOG.warn("the modem claims READY but did not answer, reopening it");
+        }
+        Channel current = channel.get();
+        try {
+            Channel replacement = reopen.open();
+            channel.set(replacement);
+            recoveries.incrementAndGet();
+            LOG.info("modem reopened and it is usable again");
+            return true;
+        } catch (ModemException e) {
+            // Expected while a dongle is mid-re-enumeration: the next tick tries again.
+            LOG.warn("the modem is not ready and could not be reopened: {}", e.getMessage());
+            return false;
         }
     }
 

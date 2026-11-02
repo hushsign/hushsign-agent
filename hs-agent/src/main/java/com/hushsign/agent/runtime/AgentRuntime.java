@@ -12,7 +12,6 @@ import com.hushsign.agent.runtime.cancel.CancellationStore;
 import com.hushsign.agent.runtime.cancel.CancellingEmissionHandler;
 import com.hushsign.agent.runtime.dedupe.DedupeStore;
 import com.hushsign.agent.runtime.execution.EmissionExecutor;
-import com.hushsign.agent.runtime.execution.ModemWatchdog;
 import com.hushsign.agent.runtime.execution.PduSender;
 import com.hushsign.agent.runtime.heartbeat.Hashes;
 import com.hushsign.agent.runtime.heartbeat.HeartbeatProducer;
@@ -80,7 +79,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
     private final HeartbeatProducer heartbeat;
     private final long heartbeatIntervalMs;
     private final Supplier<Modem> modem;
-    private final ModemWatchdog modemWatchdog;
+    private final java.util.function.BooleanSupplier modemWatchdog;
     private final String agentVersion;
     private final PolicyEngine policy;
     private final Path policyFile;
@@ -98,7 +97,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
     private AgentRuntime(String gatewayId, Spool spool, KafkaSpoolSender sender,
                          List<EmissionConsumer> consumers, CancellationConsumer cancellationConsumer,
                          HeartbeatProducer heartbeat, HeartbeatSource heartbeatSource,
-                         long heartbeatIntervalMs, Supplier<Modem> modem, ModemWatchdog modemWatchdog,
+                         long heartbeatIntervalMs, Supplier<Modem> modem, java.util.function.BooleanSupplier modemWatchdog,
                          String agentVersion,
                          PolicyEngine policy, Path policyFile, Path configFile, FileAuditChain audit,
                          AdminState admin, AuditDigestPublisher digests) {
@@ -144,7 +143,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
      */
     public static AgentRuntime start(AgentConfig config, Path configFile, Modem modem,
                                      PduSender pduSender, Supplier<Modem> modemSupplier,
-                                     ModemWatchdog modemWatchdog, String agentVersion) {
+                                     java.util.function.BooleanSupplier modemWatchdog, String agentVersion) {
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(modem, "modem");
         Objects.requireNonNull(pduSender, "pduSender");
@@ -239,7 +238,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         Thread watchdog = new Thread(() -> {
             while (!closed.get() && !Thread.currentThread().isInterrupted()) {
                 try {
-                    modemWatchdog.checkOnce();
+                    modemWatchdog.getAsBoolean();
                 } catch (RuntimeException e) {
                     LOG.warn("modem watchdog failed: {}", e.getMessage());
                 }
