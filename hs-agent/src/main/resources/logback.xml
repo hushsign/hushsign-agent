@@ -57,7 +57,11 @@
   </appender>
 
   <logger name="org.apache.kafka" level="WARN"/>
-  <logger name="com.hushsign" level="INFO"/>
+  <!-- Field diagnosis: a modem that dies mid-session cannot be explained from INFO alone, and the
+       only evidence is the last AT exchange. Both levels are overridable so a gateway can be
+       restarted with HS_LOG_LEVEL=DEBUG and HS_SMSLIB_LOG_LEVEL=DEBUG without a rebuild. -->
+  <logger name="com.hushsign" level="${HS_LOG_LEVEL:-INFO}"/>
+  <logger name="org.smslib" level="${HS_SMSLIB_LOG_LEVEL:-WARN}"/>
 
   <root level="INFO">
     <appender-ref ref="CONSOLE"/>
