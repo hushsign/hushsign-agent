@@ -37,7 +37,16 @@ A dongle that resets comes back with a different ttyUSB number, so a pin of
 /dev/ttyUSB0 can silently point at the wrong interface (or at nothing) after a
 brown-out. This really happens: during the first field test the modem dropped
 off the bus mid-transmit on a switched USB port and re-enumerated as
-/dev/ttyUSB1.
+/dev/ttyUSB1. The agent resolves the pinned link on every open, so the link is
+enough - it does not need the resulting number.
+
+Supervision
+-----------
+
+bin/hs-agent.service is the unit install.sh puts in /etc/systemd/system. If you run the agent as
+a per-user service instead (Workstation / dev box), the three lines that matter are the same and
+must not be dropped: StartLimitIntervalSec=0, Restart=always and RestartSec=10. Without them the
+unit gives up after five restarts and reports nothing more than "start-limit-hit".
 
 Files it writes
 ---------------

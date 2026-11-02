@@ -3,6 +3,11 @@ Description=HushSign edge agent
 Documentation=file:///opt/hs-agent/README.txt
 After=network-online.target
 Wants=network-online.target
+# A dongle that is missing, wedged or re-enumerating is a normal field condition, not a startup
+# bug. With systemd's default limits the unit stops for good after five quick restarts, and the
+# gateway then stays silent with nothing in the journal but "start-limit-hit" - it happened on
+# the workstation build, where the service sat "inactive" next to a working agent directory.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -28,8 +33,10 @@ UMask=0077
 # EnvironmentFile=-/etc/hs-agent/secrets.env
 
 ExecStart=/opt/hs-agent/bin/hs-agent --config /etc/hs-agent/agent.yaml
-Restart=on-failure
-RestartSec=5
+# always, not on-failure: a JVM that exits 0 while the gateway is down is still a gateway that
+# stopped sending. An explicit `systemctl stop` is not affected.
+Restart=always
+RestartSec=10
 TimeoutStopSec=40
 
 # Hardening. PrivateDevices is deliberately absent: the entire purpose of this service is a
