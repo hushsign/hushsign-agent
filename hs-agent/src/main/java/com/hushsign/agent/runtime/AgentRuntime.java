@@ -12,6 +12,7 @@ import com.hushsign.agent.runtime.cancel.CancellationStore;
 import com.hushsign.agent.runtime.cancel.CancellingEmissionHandler;
 import com.hushsign.agent.runtime.dedupe.DedupeStore;
 import com.hushsign.agent.runtime.execution.EmissionExecutor;
+import com.hushsign.agent.runtime.execution.ModemWatchdog;
 import com.hushsign.agent.runtime.execution.PduSender;
 import com.hushsign.agent.runtime.heartbeat.Hashes;
 import com.hushsign.agent.runtime.heartbeat.HeartbeatProducer;
@@ -79,6 +80,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
     private final HeartbeatProducer heartbeat;
     private final long heartbeatIntervalMs;
     private final Supplier<Modem> modem;
+    private final ModemWatchdog modemWatchdog;
     private final String agentVersion;
     private final PolicyEngine policy;
     private final Path policyFile;
@@ -96,7 +98,8 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
     private AgentRuntime(String gatewayId, Spool spool, KafkaSpoolSender sender,
                          List<EmissionConsumer> consumers, CancellationConsumer cancellationConsumer,
                          HeartbeatProducer heartbeat, HeartbeatSource heartbeatSource,
-                         long heartbeatIntervalMs, Supplier<Modem> modem, String agentVersion,
+                         long heartbeatIntervalMs, Supplier<Modem> modem, ModemWatchdog modemWatchdog,
+                         String agentVersion,
                          PolicyEngine policy, Path policyFile, Path configFile, FileAuditChain audit,
                          AdminState admin, AuditDigestPublisher digests) {
         this.gatewayId = gatewayId;
@@ -108,6 +111,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         this.heartbeatSource = heartbeatSource;
         this.heartbeatIntervalMs = heartbeatIntervalMs;
         this.modem = modem;
+        this.modemWatchdog = modemWatchdog;
         this.agentVersion = agentVersion;
         this.policy = policy;
         this.policyFile = policyFile;
@@ -128,7 +132,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
     public static AgentRuntime start(AgentConfig config, Path configFile, Modem modem,
                                      String agentVersion) {
         Objects.requireNonNull(modem, "modem");
-        return start(config, configFile, modem, modem::sendPdu, () -> modem, agentVersion);
+        return start(config, configFile, modem, modem::sendPdu, () -> modem, null, agentVersion);
     }
 
     /**
@@ -140,7 +144,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
      */
     public static AgentRuntime start(AgentConfig config, Path configFile, Modem modem,
                                      PduSender pduSender, Supplier<Modem> modemSupplier,
-                                     String agentVersion) {
+                                     ModemWatchdog modemWatchdog, String agentVersion) {
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(modem, "modem");
         Objects.requireNonNull(pduSender, "pduSender");
@@ -202,7 +206,7 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
 
         AgentRuntime runtime = new AgentRuntime(config.gatewayId(), spool, sender, consumers,
                 cancellationConsumer, heartbeat, source, config.heartbeat().intervalSeconds() * 1000L,
-                modemSupplier, agentVersion, policy, policyFile, configFile, audit, adminState,
+                modemSupplier, modemWatchdog, agentVersion, policy, policyFile, configFile, audit, adminState,
                 new AuditDigestPublisher(audit, spool, config.gatewayId(), clock));
         runtime.startThreads();
         runtime.installShutdownHook();
@@ -215,9 +219,35 @@ public final class AgentRuntime implements AutoCloseable, AdminRuntime {
         startFlusher();
         startHeartbeat();
         startDigests();
+        startModemWatchdog();
         LOG.info("agent runtime started: gateway={} operators={} workDir={}",
                 gatewayId, consumers.stream().map(EmissionConsumer::topic).toList(),
                 Path.of(spool.file().toString()).getParent());
+    }
+
+    /**
+     * Re-claims a modem that stopped working, on a clock of its own.
+     *
+     * <p>The retry inside the executor only runs when a command reaches the modem, and the policy
+     * gate sits before it: a capped target, quiet hours or a stopped schedule all mean nothing is
+     * sent, so nothing notices a dead port. This is that missing reason to look.
+     */
+    private void startModemWatchdog() {
+        if (modemWatchdog == null) {
+            return;
+        }
+        Thread watchdog = new Thread(() -> {
+            while (!closed.get() && !Thread.currentThread().isInterrupted()) {
+                try {
+                    modemWatchdog.checkOnce();
+                } catch (RuntimeException e) {
+                    LOG.warn("modem watchdog failed: {}", e.getMessage());
+                }
+                sleepQuietly(30_000);
+            }
+        }, "hs-agent-modem-watchdog");
+        watchdog.setDaemon(true);
+        watchdog.start();
     }
 
     /**

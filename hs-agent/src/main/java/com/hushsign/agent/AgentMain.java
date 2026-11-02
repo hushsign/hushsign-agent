@@ -6,12 +6,14 @@ import com.hushsign.agent.config.ConfigException;
 import com.hushsign.agent.gsm.modem.Modem;
 import com.hushsign.agent.gsm.modem.ModemConfig;
 import com.hushsign.agent.gsm.modem.ModemException;
+import com.hushsign.agent.gsm.modem.ModemState;
 import com.hushsign.agent.gsm.modem.ModemScanner;
 import com.hushsign.agent.gsm.modem.PduSubmission;
 import com.hushsign.agent.gsm.serial.JSerialCommPortFactory;
 import com.hushsign.agent.gsm.serial.SerialPortFactory;
 import com.hushsign.agent.runtime.AgentRuntime;
 import com.hushsign.agent.runtime.admin.AdminClient;
+import com.hushsign.agent.runtime.execution.ModemWatchdog;
 import com.hushsign.agent.runtime.execution.RecoveringPduSender;
 import com.hushsign.agent.runtime.admin.AdminServer;
 import com.hushsign.agent.runtime.admin.AdminSettings;
@@ -102,8 +104,15 @@ public final class AgentMain {
                     return fresh::sendPdu;
                 });
 
+        // The executor retries a failed send, but only when a command reaches the modem - and the
+        // policy gate sits before that, so a capped or idle gateway never notices a port that died.
+        // The watchdog is the independent reason to look.
+        ModemWatchdog watchdog = new ModemWatchdog(
+                () -> claimed.get().state() == ModemState.READY,
+                () -> reopenModem(config, factory, claimed));
+
         AgentRuntime runtime = AgentRuntime.start(config, configFile, modem, sender, claimed::get,
-                version(AgentMain.class.getPackage().getImplementationVersion()));
+                watchdog, version(AgentMain.class.getPackage().getImplementationVersion()));
         if (rawIdentifiers) {
             runtime.auditLog().append("STARTUP", null,
                     "log identifiers = raw: agent.log carries subscriber identifiers in clear");
