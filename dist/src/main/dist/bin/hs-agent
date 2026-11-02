@@ -21,7 +21,9 @@ fi
 # A 1 GB gateway is a realistic deployment, so the heap is bounded by a share of RAM rather than
 # by a fixed -Xmx that would be wrong on every machine but the developer's. Unquoted below so the
 # options are split into separate arguments; quoting them makes java see one long option name.
-DEFAULT_OPTS="-XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError"
+# jSerialComm loads its native shim through System.loadLibrary; Java 25 warns about that on every
+# start unless native access is granted for the classpath, and the warning buries the first log lines.
+DEFAULT_OPTS="-XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError --enable-native-access=ALL-UNNAMED"
 
 # `ctl` talks to a running agent and needs no log files of its own. Without this it would try to
 # create logs/ under the current directory, which is usually root-owned, and logback would dump
